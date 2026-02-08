@@ -56,6 +56,25 @@
 
 ---
 
+## Known Issues & Tech Debt
+
+### Must verify (Phase 2 shipped without browser testing)
+- [ ] Visual test: source view panel renders, expands/collapses, syntax colors look right on dark bg
+- [ ] Functional test: make deletions, insertions, and substitutions → confirm CriticMarkup output is correct
+- [ ] Copy button works (clipboard API requires HTTPS or localhost)
+- [ ] Debounce feels right at 500ms (not laggy, not flickery)
+
+### Serialization edge cases
+- [ ] Substitution over text that already contains old deletions — old deletions emit as standalone `{--…--}` outside the `{~~…~~}`, which is semantically correct but may look odd
+- [ ] Serializer only handles paragraphs and headings — lists, blockquotes, code blocks pass through without markdown prefixes
+- [ ] `hardBreak` nodes within a paragraph are not emitted as `\n`
+- [ ] No handling of `{>>comment<<}` yet (comments are Phase 5, but serializer will need updating)
+
+### Naming cleanup
+- [ ] `docs/prd.md` and `docs/project-context.md` still reference "CriticMark Editor" — update to "Markdown Feedback" when next editing those files
+
+---
+
 ## Backlog (Unscheduled)
 
 ### Editor Polish
@@ -64,6 +83,10 @@
 - [ ] Merge paragraphs (delete line break between them) — tracked change semantics
 - [ ] Full markdown rendering in editor (headings, bold, italic, lists, code, links, blockquotes)
 - [ ] Markdown ↔ rich text round-trip fidelity
+
+### Source View Actions
+- [ ] Paste-to-replace button: replace editor content with clipboard contents (no tracked deletions — rebaselines the document)
+- [ ] Rebaseline button: accept all tracked changes in-place, clearing markup and producing a clean document
 
 ### Accept / Reject
 - [ ] Accept/reject individual changes to produce a clean document

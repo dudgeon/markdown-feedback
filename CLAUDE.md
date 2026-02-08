@@ -10,7 +10,7 @@ Full specification lives in `docs/prd.md` and `docs/project-context.md`. Roadmap
 
 **Live:** https://dudgeon.github.io/markdown-feedback/
 
-**Status:** Phase 2 COMPLETE (serialization + source view). Next: Phase 3 (import/export).
+**Status:** Phase 2 COMPLETE (serialization + source view + deploy). **Not yet browser-tested** — verify source view visually before starting Phase 3. Next: Phase 3 (import/export).
 
 ## Commands
 
@@ -41,7 +41,7 @@ This project uses an intercept-based architecture, NOT a diff-based approach. Ev
   - `TrackedDeletion` mark — red strikethrough, `contenteditable=false`, non-inclusive
   - `TrackedInsertion` mark — green text, inclusive (extends when typing at edges)
   - `TrackChanges` extension — uses `handleKeyDown`, `handleTextInput`, and `handlePaste` to intercept edits directly (NOT `appendTransaction` — input handlers proved simpler and more reliable)
-- `src/utils/serializeCriticMarkup.ts` — Walks ProseMirror doc tree and emits CriticMarkup string. Handles standalone deletions/insertions and paired substitutions.
+- `src/utils/serializeCriticMarkup.ts` — Walks ProseMirror doc tree and emits CriticMarkup string. Key design: `pairedWith !== null` distinguishes substitution parts from standalone changes. Standalone deletions each get unique nanoid IDs (merge by adjacency, not ID). Substitution deletions share the same `id`/`pairedWith` pair.
 - `src/components/Editor.tsx` — TipTap editor setup with serialization wiring and source view
 - `src/components/SourceView.tsx` — Collapsible panel showing syntax-highlighted CriticMarkup output with copy button
 - `src/hooks/useDebouncedValue.ts` — Generic debounce hook for source view updates
@@ -74,10 +74,20 @@ Node v18 is too old for Vite 7. Use NVM to switch (shell state doesn't persist b
 export NVM_DIR="$HOME/.nvm" && [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" && nvm use 20.19.3
 ```
 
+## Deployment
+
+Pushing to `main` auto-deploys to GitHub Pages via `.github/workflows/deploy.yml`.
+
+The `base` path in `vite.config.ts` **must** match the repo name (`/markdown-feedback/`). This affects:
+- Production asset paths (CSS, JS bundles)
+- Dev server URL: `http://localhost:5173/markdown-feedback/` (not just `/`)
+
+If the repo is ever renamed, update `base` in `vite.config.ts` to match.
+
 ## Testing
 
 Always verify changes in the browser, not just with `tsc` or `npm run build`. Use the Chrome browser automation tools (`mcp__claude-in-chrome__*`) to:
-1. Navigate to http://localhost:5173/
+1. Navigate to http://localhost:5173/markdown-feedback/
 2. Make edits (click, type, select+delete, select+type)
 3. Screenshot to verify visual styling
 4. `javascript_tool` to inspect DOM structure
