@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+/* TipTap editor styles */
+.tiptap {
+  outline: none;
+  min-height: 300px;
+  padding: 1rem;
+}
+
+.tiptap p {
+  margin: 0.5em 0;
+}
+
+.tiptap h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin: 0.75em 0 0.5em;
+}
+
+.tiptap h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0.75em 0 0.5em;
+}
+
+.tiptap h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0.75em 0 0.5em;
+}
+
+.tiptap ul,
+.tiptap ol {
+  padding-left: 1.5em;
+  margin: 0.5em 0;
+}
+
+.tiptap blockquote {
+  border-left: 3px solid #d1d5db;
+  padding-left: 1em;
+  margin: 0.5em 0;
+  color: #6b7280;
+}
+
+.tiptap code {
+  background: #f3f4f6;
+  border-radius: 0.25em;
+  padding: 0.1em 0.3em;
+  font-size: 0.9em;
+}
+
+.tiptap pre {
+  background: #1f2937;
+  color: #f9fafb;
+  border-radius: 0.5em;
+  padding: 1em;
+  overflow-x: auto;
+}
+
+.tiptap pre code {
+  background: none;
+  padding: 0;
+  color: inherit;
+}
+
+/* Track changes mark styles */
+.tracked-deletion {
+  color: #dc2626;
+  text-decoration: line-through;
+  text-decoration-color: #dc2626;
+  user-select: none;
+}
+
+.tracked-insertion {
+  color: #16a34a;
+  background-color: #dcfce7;
+  border-radius: 1px;
+}
+
+/* Substitution visual connector — adjacent deletion+insertion */
+.tracked-deletion[data-paired] + .tracked-insertion[data-paired] {
+  margin-left: 1px;
+}
