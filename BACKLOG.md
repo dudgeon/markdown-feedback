@@ -51,13 +51,25 @@
 ## Up Next
 
 ### Phase 5: Annotation System
-- [ ] Edit / Annotate mode toggle in toolbar
-- [ ] Editor becomes read-only in Annotate mode
-- [ ] Inline comment input in Changes Panel per change
-- [ ] Tab → type → Enter → Tab rapid-annotation flow
-- [ ] Comments serialize as `{>>…<<}` immediately after their change
-- [ ] Comments re-import on "Resume editing"
-- [ ] Orphaned comment handling (undo removes parent change)
+
+**Two types of comments:**
+1. **Edit comments** — attached to a tracked change (deletion, insertion, or substitution). Serialized as `{>>…<<}` immediately after the change markup.
+2. **Standalone comments** — on unchanged text, independent of any edit. User selects a passage and adds a comment without modifying it. Serialized as `{==highlighted text==}{>>comment<<}` (CriticMarkup highlight syntax).
+
+Not all edits will have comments, and not all comments will be attached to edits.
+
+**Tasks:**
+- [ ] Inline comment input in Changes Panel per change (text field below each change card)
+- [ ] Standalone comment: select text in editor + keyboard shortcut to create a highlight + comment (no edit required)
+- [ ] Standalone comments appear in Changes Panel alongside edits, in document order
+- [ ] Keyboard shortcut (Tab) to jump focus from editor to comment input for the nearest/last change or highlight
+- [ ] From comment input: Enter to save, Tab to return focus to editor at the same cursor position
+- [ ] Edit comments serialize as `{>>…<<}` immediately after their change
+- [ ] Standalone comments serialize as `{==highlighted text==}{>>comment<<}`
+- [ ] Both comment types re-import on paste import
+- [ ] Orphaned comment handling (undo removes parent change → comment becomes standalone or is removed)
+
+**Design decision:** No separate Edit/Annotate mode. The editor stays editable at all times. Users flow between editing and annotating via keyboard shortcuts — make an edit, Tab to annotate it, Tab back to keep editing. This matches the natural review workflow where commentary and revision are interleaved.
 
 ### Phase 6: Session Persistence + Undo
 - [ ] localStorage auto-save (debounced 1s)
@@ -170,9 +182,6 @@ Refinements that improve the feel but aren't blockers.
 - [ ] Pre-defined tags: `[tone]`, `[clarity]`, `[structure]`, `[grammar]`, `[concision]`, `[accuracy]`
 - [ ] Keyboard shortcuts or buttons for quick tagging
 - [ ] Serialize as prefixed comments: `{>>[tone] comment text<<}`
-
-### Highlight Mode
-- [ ] `{==highlighted text==}{>>comment<<}` for flagging passages without changing them
 
 ### Google Docs → CriticMarkup Extraction
 - [ ] Take a Google Doc with track changes/comments and extract in CriticMarkup format
