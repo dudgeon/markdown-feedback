@@ -1,10 +1,12 @@
 # CriticMark Editor — Product Requirements Document
 
-**Version:** 0.2 (Intercept Architecture)
+**Status:** In progress (Phase 1 complete, see `BACKLOG.md` for roadmap)
+**Architecture:** Intercept-based (see below and `docs/project-context.md` for rationale)
 **Author:** Geoff + Claude
 **Date:** 2026-02-08
 **Build target:** Web app (React), portable to Claude Code or other implementations
-**Revision note:** v0.2 is a fundamental rearchitecture from v0.1. The diff-based model (freeze a base, edit a copy, compare them) has been replaced with an intercept-based model where the editor captures every edit action as CriticMarkup in real time. This is the difference between a diff tool and a track-changes editor.
+
+> **Document history:** This PRD replaced an earlier diff-based design. The diff model (freeze a base, edit a copy, compare them) was rejected in favor of an intercept model where the editor captures every edit action as CriticMarkup in real time. See `docs/project-context.md` §7 for the full decision rationale.
 
 ---
 

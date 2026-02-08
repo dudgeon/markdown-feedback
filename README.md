@@ -1,73 +1,61 @@
-# React + TypeScript + Vite
+# CriticMark Editor
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A web-based track-changes editor for markdown. Edit naturally — every deletion, insertion, and substitution is captured automatically as [CriticMarkup](http://criticmarkup.com/spec.php) notation.
 
-Currently, two official plugins are available:
+Built for the workflow: LLM generates draft → human edits in CriticMark → changes + annotations exported as portable `.md` → patterns analyzed to improve future drafts.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Status
 
-## React Compiler
+**Phase 1 complete** (intercept spike validated). Phase 2 (CriticMarkup serialization + source view) is next. See [BACKLOG.md](BACKLOG.md) for the full roadmap.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## How It Works
 
-## Expanding the ESLint configuration
+The editor intercepts every edit at the keyboard/input level and transforms it into a tracked change. The document *is* the change log — there is no separate "before" and "after."
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+| User Action | Result |
+|---|---|
+| Delete original text | Text stays in document as red strikethrough |
+| Type new text | New text appears in green |
+| Select original + type replacement | Substitution: strikethrough old + green new, linked |
+| Edit within your own insertion | Normal editing (no tracking) |
+| Backspace on already-deleted text | Cursor skips over it |
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+The output is standard CriticMarkup:
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```
+The team {~~delivered the results~>presented their findings~~}{>>active voice is more direct<<} to the board.
+{--This sentence was redundant.--}{>>removed for concision<<}
+{++A new concluding thought.++}
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Quick Start
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+# Requires Node 20+
+npm install
+npm run dev       # http://localhost:5173/
 ```
+
+## Commands
+
+```bash
+npm run dev       # Vite dev server with HMR
+npm run build     # TypeScript check + production build
+npm run lint      # ESLint
+npm run preview   # Preview production build
+```
+
+## Tech Stack
+
+- React 19 + TypeScript (strict)
+- TipTap 3 (ProseMirror) — editor framework
+- Tailwind CSS 4
+- Vite 7
+- nanoid — unique IDs for tracked change spans
+
+## Project Documents
+
+- [BACKLOG.md](BACKLOG.md) — Roadmap and feature backlog
+- [docs/prd.md](docs/prd.md) — Full product requirements (intercept architecture)
+- [docs/project-context.md](docs/project-context.md) — Decision log and project context
+- [CLAUDE.md](CLAUDE.md) — AI coding assistant instructions

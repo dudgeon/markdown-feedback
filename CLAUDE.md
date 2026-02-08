@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 CriticMark Editor — a web-based track-changes editor for markdown that intercepts edits in real-time and records them as CriticMarkup notation. Users edit LLM-generated documents; every change (insertion, deletion, substitution) is captured automatically with optional annotations.
 
-Full specification lives in `prd-criticmark-editor-v2.md` and `criticmark-project-context.md` (if present in repo). Implementation plan: `.claude/plans/atomic-drifting-kettle.md`.
+Full specification lives in `docs/prd.md` and `docs/project-context.md`. Roadmap and feature backlog: `BACKLOG.md`.
 
 **Status:** Phase 1 COMPLETE (intercept spike validated). Next: Phase 2 (CriticMarkup serialization + source view).
 
@@ -80,6 +80,36 @@ Always verify changes in the browser, not just with `tsc` or `npm run build`. Us
 
 Run `npm run build` (not just `tsc --noEmit`) to catch all TypeScript errors including unused variables.
 
+## File Organization
+
+### Repository Layout
+
+```
+README.md                  # Project overview (public-facing)
+CLAUDE.md                  # AI coding assistant instructions
+BACKLOG.md                 # Roadmap + feature backlog
+docs/                      # Specification & design documents
+  prd.md                   # Product requirements document
+  project-context.md       # Decision log & project context
+src/                       # Application source code
+  components/              # React components
+  extensions/              # TipTap/ProseMirror extensions
+```
+
+### Naming Conventions
+
+- **Root-level project files:** UPPERCASE with `.md` extension (`README.md`, `CLAUDE.md`, `BACKLOG.md`)
+- **Docs folder:** lowercase, hyphen-separated, no project-name prefix (`prd.md` not `criticmark-prd-v2.md`)
+- **Source files:** camelCase for `.ts`/`.tsx` files, matching the default export name
+- **No version numbers in filenames.** Version history lives in git. Document status (if needed) goes in the document header, not the filename.
+- **No redundant prefixes.** Everything in this repo is CriticMark — don't prefix filenames with `criticmark-`.
+
+### When Adding New Documents
+
+- Specs, designs, and research go in `docs/`
+- Update the "Project Documents" section in `README.md` when adding a new doc
+- Keep `BACKLOG.md` as the single source of truth for what's planned, in progress, and done
+
 ## Rules
 
 ### No Destructive Scaffolding
@@ -93,7 +123,7 @@ If a scaffold is needed:
 
 ### Preserve Specification Documents
 
-`prd-criticmark-editor-v2.md` and `criticmark-project-context.md` are primary project artifacts. Never delete, overwrite, or move them without explicit user approval.
+`docs/prd.md` and `docs/project-context.md` are primary project artifacts. Never delete, overwrite, or move them without explicit user approval.
 
 ## Relevant Skills for This Build
 
