@@ -155,6 +155,13 @@ Refinements that improve the feel but aren't blockers.
 - [ ] Paste-to-replace button: replace editor content with clipboard contents (no tracked deletions — rebaselines the document)
 - [ ] Rebaseline button: accept all tracked changes in-place, clearing markup and producing a clean document
 
+### Share (Web Share API)
+- [ ] "Share" option in the Export dropdown menu, visible only when `navigator.share` is available (iOS Safari, Chrome Android)
+- [ ] Shares the full CriticMarkup markdown body as text via the native OS share sheet
+- [ ] Fallback: hidden on desktop browsers that don't support the Web Share API (existing clipboard/download exports cover that case)
+- [ ] Must be triggered from a user gesture (click handler) per browser security requirements
+- [ ] Stretch: option to share as a `.md` file attachment via `navigator.share({ files })` for platforms that support it
+
 ### Accept / Reject
 - [ ] Accept/reject individual changes to produce a clean document
 - [ ] Accept all / Reject all bulk operations
