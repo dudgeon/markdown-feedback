@@ -92,6 +92,11 @@
 
 ## Backlog (Unscheduled)
 
+### About Panel
+- [ ] Left slide-in overlay panel with app description, motivation, GitHub link, and credits
+- [ ] Triggered by discrete info icon next to app title; closes via backdrop click or Escape
+- [ ] Spec: `docs/about-panel.md`
+
 ### Editor Polish
 - [ ] Paragraph-level deletions (CriticMarkup can't span paragraph boundaries)
 - [ ] Paste handling: strip formatting vs. preserve markdown-compatible formatting
