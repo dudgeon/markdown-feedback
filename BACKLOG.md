@@ -65,6 +65,53 @@
 - [ ] Undo/redo at tracked-change level (undo deletion = restore to original, not re-insert)
 - [ ] Mixed-span operations (select across original + inserted + deleted text)
 
+### Phase 7: Responsive Design
+
+Make the app usable across screen sizes without redesigning the desktop experience. The two-column layout with a fixed-width changes panel currently breaks below ~768px.
+
+**Design principles:**
+- Desktop layout (> 1024px) is the primary experience and must not regress
+- Responsive behavior uses Tailwind breakpoint prefixes (`sm:`, `md:`, `lg:`), not custom media queries
+- Changes panel becomes a toggle-able overlay/drawer on small screens, not a permanent column
+- No new dependencies — Tailwind utilities and native CSS only
+
+**Breakpoints:**
+- `< 768px` (mobile): single-column, panel as slide-over drawer
+- `768px–1024px` (tablet): single-column with wider drawer, or narrow persistent panel
+- `> 1024px` (desktop): current two-column layout, no changes
+
+#### Tier 1: Usable on Small Screens
+Core layout changes that prevent the app from being broken on phones/tablets.
+
+- [ ] **Collapsible changes panel** — hide panel by default below `lg:` (1024px); add a toggle button (e.g., badge with change count) to open as a slide-over drawer from the right
+- [ ] **Single-column editor** — below `lg:`, editor takes full width; remove `flex` row layout and `w-80` constraint
+- [ ] **Responsive toolbar** — stack or wrap toolbar items on narrow screens; ensure Import/Export buttons don't overlap the title
+- [ ] **Export dropdown repositioning** — on small screens, anchor dropdown to viewport edge or use a bottom sheet instead of absolute `right-0`
+- [ ] **Responsive padding** — reduce `p-6` outer padding to `p-3` or `p-4` on mobile
+- [ ] **Source view** — already wraps text; verify horizontal scroll is usable on touch; reduce `max-h-96` if needed
+
+#### Tier 2: Touch-Friendly
+Improvements for finger-based interaction (phone, tablet without keyboard).
+
+- [ ] **Tap target sizing** — ensure all buttons, change cards, and interactive elements meet 44×44px minimum
+- [ ] **Import modal** — increase textarea height on mobile (or make it `flex-1` to fill available space); larger action buttons
+- [ ] **Change card interaction** — change cards should have generous padding and clear active/pressed states for touch
+- [ ] **Scroll-to behavior** — verify click-to-scroll works on touch; may need `scrollIntoView` with `behavior: 'smooth'` adjustment
+
+#### Tier 3: Polish
+Refinements that improve the feel but aren't blockers.
+
+- [ ] **Responsive typography** — scale heading (`text-2xl` → `text-xl`) and body text for readability on small screens
+- [ ] **Drawer animation** — slide-in/out transition for the changes panel drawer (CSS `translate-x` + `transition`)
+- [ ] **Landscape phone layout** — test and handle landscape orientation where viewport is wide but very short
+- [ ] **PWA viewport** — add `<meta name="viewport">` if missing; test pinch-zoom behavior doesn't break the editor
+- [ ] **Keyboard avoidance** — on mobile, ensure the editor isn't obscured by the software keyboard when typing
+
+**Scope notes:**
+- This is not a mobile-first redesign — the goal is "doesn't break" (Tier 1), then "pleasant" (Tier 2), then "polished" (Tier 3)
+- Editing on mobile with contentEditable is inherently limited (selection, cursor positioning, IME). Tier 1 makes reading and reviewing changes viable on mobile; serious editing remains a desktop activity
+- The annotation workflow (Phase 5) should be designed responsive from the start, since reviewing changes is a realistic mobile use case
+
 ---
 
 ## Known Issues & Tech Debt
@@ -130,53 +177,6 @@
 - [ ] LLM pre-edit: Claude proposes edits as CriticMarkup, human reviews in-editor (bidirectional workflow)
 - [ ] AI comment suggestions: given the change + context, suggest annotation text
 - [ ] Style rule extraction: analyze patterns across multiple CriticMarkup files to generate writing rules
-
-### Responsive Design
-
-The app currently has no responsive breakpoints — the two-column layout with a fixed-width changes panel breaks below ~768px. This work makes the app usable across screen sizes without redesigning the desktop experience.
-
-**Design principles:**
-- Desktop layout is the primary experience and should not regress
-- Responsive behavior uses Tailwind breakpoint prefixes (`sm:`, `md:`, `lg:`), not custom media queries
-- Changes panel becomes a toggle-able overlay/drawer on small screens, not a permanent column
-- No new dependencies — Tailwind utilities and native CSS only
-
-**Breakpoints:**
-- `< 768px` (mobile): single-column, panel as slide-over drawer
-- `768px–1024px` (tablet): single-column with wider drawer, or narrow persistent panel
-- `> 1024px` (desktop): current two-column layout, no changes
-
-#### Tier 1: Usable on Small Screens
-Core layout changes that prevent the app from being broken on phones/tablets.
-
-- [ ] **Collapsible changes panel** — hide panel by default below `lg:` (1024px); add a toggle button (e.g., badge with change count) to open as a slide-over drawer from the right
-- [ ] **Single-column editor** — below `lg:`, editor takes full width; remove `flex` row layout and `w-80` constraint
-- [ ] **Responsive toolbar** — stack or wrap toolbar items on narrow screens; ensure Import/Export buttons don't overlap the title
-- [ ] **Export dropdown repositioning** — on small screens, anchor dropdown to viewport edge or use a bottom sheet instead of absolute `right-0`
-- [ ] **Responsive padding** — reduce `p-6` outer padding to `p-3` or `p-4` on mobile
-- [ ] **Source view** — already wraps text; verify horizontal scroll is usable on touch; reduce `max-h-96` if needed
-
-#### Tier 2: Touch-Friendly
-Improvements for finger-based interaction (phone, tablet without keyboard).
-
-- [ ] **Tap target sizing** — ensure all buttons, change cards, and interactive elements meet 44×44px minimum
-- [ ] **Import modal** — increase textarea height on mobile (or make it `flex-1` to fill available space); larger action buttons
-- [ ] **Change card interaction** — change cards should have generous padding and clear active/pressed states for touch
-- [ ] **Scroll-to behavior** — verify click-to-scroll works on touch; may need `scrollIntoView` with `behavior: 'smooth'` adjustment
-
-#### Tier 3: Polish
-Refinements that improve the feel but aren't blockers.
-
-- [ ] **Responsive typography** — scale heading (`text-2xl` → `text-xl`) and body text for readability on small screens
-- [ ] **Drawer animation** — slide-in/out transition for the changes panel drawer (CSS `translate-x` + `transition`)
-- [ ] **Landscape phone layout** — test and handle landscape orientation where viewport is wide but very short
-- [ ] **PWA viewport** — add `<meta name="viewport">` if missing; test pinch-zoom behavior doesn't break the editor
-- [ ] **Keyboard avoidance** — on mobile, ensure the editor isn't obscured by the software keyboard when typing
-
-**Scope notes:**
-- This is not a mobile-first redesign — the goal is "doesn't break" (Tier 1), then "pleasant" (Tier 2), then "polished" (Tier 3)
-- Editing on mobile with contentEditable is inherently limited (selection, cursor positioning, IME). Tier 1 makes reading and reviewing changes viable on mobile; serious editing remains a desktop activity
-- The annotation workflow (Phase 5) should be designed responsive from the start, since reviewing changes is a realistic mobile use case
 
 ### Platform Expansion
 - [ ] Obsidian plugin (native integration into knowledge management ecosystem)
