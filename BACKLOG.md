@@ -19,17 +19,24 @@
 - [x] Copy-to-clipboard button on source view
 - [x] GitHub Pages deployment (auto-deploy on push to main)
 - [x] Renamed app to "Markdown Feedback"
+- [x] Browser-verified: source view renders, expands/collapses, syntax colors, copy button, debounce all confirmed working
+
+### Phase 3: Import / Export
+- [x] CriticMarkup parser/deserializer (`parseCriticMarkup.ts`)
+- [x] Paste import modal with automatic CriticMarkup parsing
+- [x] Sample content loaded through parser (not hardcoded HTML)
+- [x] Primary export: `.md` download with YAML frontmatter (`criticmark:` namespace)
+- [x] Secondary exports: clean/accepted, original/rejected, copy to clipboard
+- [x] Export dropdown menu component
+
+**Phase 3 scope decisions:**
+- File picker and drag-and-drop deferred — paste is the primary import modality
+- Import always parses CriticMarkup (no "Start fresh" vs "Resume editing" prompt). The planned "rebaseline" feature (see Backlog > Source View Actions) is the path to clear markup when desired.
+- localStorage persistence deferred to Phase 6
 
 ---
 
 ## Up Next
-
-### Phase 3: Import / Export
-- [ ] File import via file picker (`.md` → all content as original status)
-- [ ] Paste import (textarea modal)
-- [ ] CriticMarkup-aware re-import ("Resume editing" vs "Start fresh" prompt)
-- [ ] Primary export: `.md` download with YAML frontmatter (`criticmark:` namespace)
-- [ ] Secondary exports: clean/accepted, original/rejected, copy to clipboard
 
 ### Phase 4: Changes Panel
 - [ ] Right sidebar listing all tracked changes by document position
@@ -58,11 +65,8 @@
 
 ## Known Issues & Tech Debt
 
-### Must verify (Phase 2 shipped without browser testing)
-- [ ] Visual test: source view panel renders, expands/collapses, syntax colors look right on dark bg
-- [ ] Functional test: make deletions, insertions, and substitutions → confirm CriticMarkup output is correct
-- [ ] Copy button works (clipboard API requires HTTPS or localhost)
-- [ ] Debounce feels right at 500ms (not laggy, not flickery)
+### Editor rendering
+- [ ] Ordered and unordered lists indent correctly but bullets/numbers don't render visually (TipTap recognizes the list structure but `list-style-type` is suppressed or missing in CSS)
 
 ### Serialization edge cases
 - [ ] Substitution over text that already contains old deletions — old deletions emit as standalone `{--…--}` outside the `{~~…~~}`, which is semantically correct but may look odd

@@ -206,3 +206,30 @@ He explicitly values tools that "disappear" — that let him focus on the work, 
 6. **Session management edge cases:** What if the user imports a new file while an edited session exists? Warn and confirm? Auto-save the current session first? Allow multiple sessions in parallel (probably not for prototype)?
 
 7. **Comment editing after the fact:** If the user adds a comment in Annotate mode, then switches back to Edit mode and changes the text they commented on (e.g., further refining a substitution), should the comment persist? Be flagged as potentially stale? The PRD says comments attach to span IDs, so they persist — but the comment might no longer make sense if the change has evolved.
+
+---
+
+## 9. Phase 3 Decisions: Import / Export
+
+**Date:** 2026-02-08
+
+### Scope narrowing
+
+The PRD (§3.5–3.6) specifies file picker import, paste import, drag-and-drop, CriticMarkup detection with "Start fresh" vs "Resume editing" prompt, and session recovery from localStorage. Phase 3 narrowed this to:
+
+1. **Paste-only import.** File picker and drag-and-drop deferred. Pasting markdown into a textarea modal is the primary import modality for now. This matches the actual workflow: copy from a Claude conversation or other tool, paste into the editor.
+
+2. **Always parse CriticMarkup.** No "Start fresh" vs "Resume editing" prompt. When content is imported (via paste or on initial load), CriticMarkup tokens are always parsed and reconstructed as tracked changes. Rationale: simpler flow, and the planned "rebaseline" feature (accept all changes, clearing markup) handles the case where the user wants to start fresh from CriticMarkup content.
+
+3. **No localStorage persistence.** Session recovery deferred to Phase 6. Phase 3 focuses on explicit import/export, not background persistence.
+
+### Export variants
+
+- **Primary:** CriticMarkup `.md` with YAML frontmatter (`criticmark:` namespace, `edit_date` + `changes_total`)
+- **Clean (accepted):** Strip all CriticMarkup, apply all changes (keep insertions, remove deletions, resolve substitutions to new text)
+- **Original (rejected):** Strip all CriticMarkup, reject all changes (remove insertions, restore deletions, resolve substitutions to old text)
+- **Copy to clipboard:** Same CriticMarkup text as the source view
+
+### Parser design
+
+The CriticMarkup parser (`parseCriticMarkup.ts`) uses a single-pass regex approach. It tokenizes the string into typed segments (original, deletion, insertion) with nanoid IDs and `pairedWith` links for substitutions. Comments (`{>>…<<}`) are silently stripped (Phase 5 will add comment support). The segments are then converted to TipTap-compatible HTML via `criticMarkupToHTML()`, which TipTap's `parseHTML` rules reconstruct into ProseMirror marks with the correct attributes.

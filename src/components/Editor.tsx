@@ -8,17 +8,24 @@ import {
   TrackChanges,
 } from '../extensions/trackChanges'
 import SourceView from './SourceView'
+import ImportModal from './ImportModal'
+import ExportMenu from './ExportMenu'
 import { serializeCriticMarkup } from '../utils/serializeCriticMarkup'
+import { criticMarkupToHTML } from '../utils/parseCriticMarkup'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 
-const SAMPLE_CONTENT = `<h1>Project Update</h1>
-<p>The results were delivered by the team at the quarterly review. This was a significant milestone in the project's ongoing development trajectory.</p>
-<p>The team has been working very hard on the new features that were requested by the stakeholders. We believe that these improvements will significantly enhance the user experience going forward.</p>
-<p>In conclusion, the project is on track and we are confident that we will meet all of the deadlines that have been established for this quarter.</p>`
+const SAMPLE_MARKDOWN = `# Project Update
+
+The results were delivered by the team at the quarterly review. This was a significant milestone in the project's ongoing development trajectory.
+
+The team has been working very hard on the new features that were requested by the stakeholders. We believe that these improvements will significantly enhance the user experience going forward.
+
+In conclusion, the project is on track and we are confident that we will meet all of the deadlines that have been established for this quarter.`
 
 export default function Editor() {
   const [rawMarkup, setRawMarkup] = useState('')
   const [sourceExpanded, setSourceExpanded] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
 
   const debouncedMarkup = useDebouncedValue(rawMarkup, 500)
 
@@ -36,23 +43,46 @@ export default function Editor() {
       TrackedInsertion,
       TrackChanges,
     ],
-    content: SAMPLE_CONTENT,
+    content: criticMarkupToHTML(SAMPLE_MARKDOWN),
     onUpdate: handleEditorChange,
     onCreate: handleEditorChange,
   })
 
+  const handleImport = useCallback(
+    (text: string) => {
+      if (!editor) return
+      const html = criticMarkupToHTML(text)
+      editor.commands.setContent(html)
+    },
+    [editor]
+  )
+
   return (
     <div className="max-w-4xl mx-auto p-6">
       <div className="mb-4">
-        <h1 className="text-2xl font-bold text-gray-900">
-          Markdown Feedback
-        </h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Edit the text below. Deletions appear as{' '}
-          <span className="tracked-deletion">red strikethrough</span>,
-          insertions as{' '}
-          <span className="tracked-insertion">green text</span>.
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">
+              Markdown Feedback
+            </h1>
+            <p className="text-sm text-gray-500 mt-1">
+              Edit the text below. Deletions appear as{' '}
+              <span className="tracked-deletion">red strikethrough</span>,
+              insertions as{' '}
+              <span className="tracked-insertion">green text</span>.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setImportOpen(true)}
+              className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 cursor-pointer transition-colors"
+            >
+              Import
+            </button>
+            <ExportMenu markup={rawMarkup} />
+          </div>
+        </div>
       </div>
 
       <div className="border border-gray-300 rounded-lg bg-white shadow-sm">
@@ -65,12 +95,11 @@ export default function Editor() {
         onToggle={() => setSourceExpanded((prev) => !prev)}
       />
 
-      <div className="mt-4 text-xs text-gray-400">
-        <p>
-          Phase 2 — CriticMarkup serialization + source view. Toggle the
-          source panel below the editor to see live CriticMarkup output.
-        </p>
-      </div>
+      <ImportModal
+        isOpen={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImport={handleImport}
+      />
     </div>
   )
 }
