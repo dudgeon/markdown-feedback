@@ -6,7 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 CriticMark Editor — a web-based track-changes editor for markdown that intercepts edits in real-time and records them as CriticMarkup notation. Users edit LLM-generated documents; every change (insertion, deletion, substitution) is captured automatically with optional annotations.
 
-Full specification lives in `prd-criticmark-editor-v2.md` and `criticmark-project-context.md` (if present in repo). Currently in Phase 1 spike — testing the TipTap intercept plugin.
+Full specification lives in `prd-criticmark-editor-v2.md` and `criticmark-project-context.md` (if present in repo). Implementation plan: `.claude/plans/atomic-drifting-kettle.md`.
+
+**Status:** Phase 1 COMPLETE (intercept spike validated). Next: Phase 2 (CriticMarkup serialization + source view).
 
 ## Commands
 
@@ -36,8 +38,7 @@ This project uses an intercept-based architecture, NOT a diff-based approach. Ev
 - `src/extensions/trackChanges.ts` — Core of the system. Contains:
   - `TrackedDeletion` mark — red strikethrough, `contenteditable=false`, non-inclusive
   - `TrackedInsertion` mark — green text, inclusive (extends when typing at edges)
-  - `TrackChangesPlugin` — `appendTransaction`-based approach (currently returns null — superseded by handler approach)
-  - `TrackChanges` — Active implementation using `handleKeyDown`, `handleTextInput`, and `handlePaste` to intercept edits directly
+  - `TrackChanges` extension — uses `handleKeyDown`, `handleTextInput`, and `handlePaste` to intercept edits directly (NOT `appendTransaction` — input handlers proved simpler and more reliable)
 - `src/components/Editor.tsx` — TipTap editor setup with sample content
 - `src/index.css` — Track changes visual styles (`.tracked-deletion`, `.tracked-insertion`) + TipTap editor styles
 
@@ -61,10 +62,43 @@ This project uses an intercept-based architecture, NOT a diff-based approach. Ev
 {>>comment text<<}       — Comments (immediately after change)
 ```
 
+## Environment
+
+Node v18 is too old for Vite 7. Use NVM to switch (shell state doesn't persist between commands):
+```bash
+export NVM_DIR="$HOME/.nvm" && [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" && nvm use 20.19.3
+```
+
+## Testing
+
+Always verify changes in the browser, not just with `tsc` or `npm run build`. Use the Chrome browser automation tools (`mcp__claude-in-chrome__*`) to:
+1. Navigate to http://localhost:5173/
+2. Make edits (click, type, select+delete, select+type)
+3. Screenshot to verify visual styling
+4. `javascript_tool` to inspect DOM structure
+5. `read_console_messages` to check for JS errors
+
+Run `npm run build` (not just `tsc --noEmit`) to catch all TypeScript errors including unused variables.
+
+## Rules
+
+### No Destructive Scaffolding
+
+Never run scaffold commands (`npm create`, `npx create-*`, `vite create`, etc.) that overwrite or delete existing files in the repo. Scaffolding tools assume an empty directory and will silently destroy project files (docs, config, source) without warning.
+
+If a scaffold is needed:
+1. Run it in a temporary directory outside the repo
+2. Copy only the needed files into the project
+3. Verify no existing files were lost with `git status` before proceeding
+
+### Preserve Specification Documents
+
+`prd-criticmark-editor-v2.md` and `criticmark-project-context.md` are primary project artifacts. Never delete, overwrite, or move them without explicit user approval.
+
 ## Relevant Skills for This Build
 
-- **ProseMirror internals** — marks, schema, transactions, plugins, `appendTransaction`, step mapping
-- **TipTap 3 extension API** — `Mark.create`, `Extension.create`, `addProseMirrorPlugins`, `handleKeyDown`/`handleTextInput`/`handlePaste` props
+- **ProseMirror internals** — marks, schema, transactions, plugins, step mapping
+- **TipTap extension API** — `Mark.create`, `Extension.create`, `addProseMirrorPlugins`, `handleKeyDown`/`handleTextInput`/`handlePaste` props
 - **DOM contentEditable behavior** — cursor positioning, selection ranges, `beforeinput` events
 - **CriticMarkup spec** — http://criticmarkup.com/spec.php
 - **Obsidian CriticMarkup plugin** — https://github.com/Fevol/obsidian-criticmarkup (compatibility target)
