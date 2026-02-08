@@ -10,7 +10,7 @@ Full specification lives in `docs/prd.md` and `docs/project-context.md`. Roadmap
 
 **Live:** https://dudgeon.github.io/markdown-feedback/
 
-**Status:** Phase 3 COMPLETE (import/export). Next: Phase 4 (changes panel).
+**Status:** Phase 4 COMPLETE (changes panel). Next: Phase 5 (annotation system).
 
 ## Commands
 
@@ -44,7 +44,9 @@ This project uses an intercept-based architecture, NOT a diff-based approach. Ev
 - `src/utils/serializeCriticMarkup.ts` — Walks ProseMirror doc tree and emits CriticMarkup string. Key design: `pairedWith !== null` distinguishes substitution parts from standalone changes. Standalone deletions each get unique nanoid IDs (merge by adjacency, not ID). Substitution deletions share the same `id`/`pairedWith` pair.
 - `src/utils/parseCriticMarkup.ts` — Reverse of serializer. `parseCriticMarkup()` tokenizes a CriticMarkup string into typed segments; `criticMarkupToHTML()` converts those segments into TipTap-compatible HTML with tracked-change spans. Used for both paste import and initial sample content loading.
 - `src/utils/exportDocument.ts` — Export functions: `exportCriticMarkup()` (YAML frontmatter + markup), `exportClean()` (accept all changes), `exportOriginal()` (reject all changes), `countChanges()`, `downloadFile()`.
-- `src/components/Editor.tsx` — TipTap editor setup with toolbar (Import + Export), serialization wiring, and source view
+- `src/utils/extractChanges.ts` — Walks ProseMirror doc tree and extracts a structured `ChangeEntry[]` list with type, text, context snippets, and positions. Same walk pattern as serializer but captures absolute positions for scroll-to and surrounding original text for context display.
+- `src/components/Editor.tsx` — TipTap editor setup with two-column layout (editor left, changes panel right), toolbar (Import + Export), serialization wiring, and source view
+- `src/components/ChangesPanel.tsx` — Right sidebar listing all tracked changes in document order. Shows change type badge (Deleted/Inserted/Replaced), context snippets with inline highlighting, and click-to-scroll.
 - `src/components/ImportModal.tsx` — Paste import modal. Content is always parsed for CriticMarkup tokens (no "Start fresh" vs "Resume editing" prompt — the planned rebaseline feature handles clearing markup).
 - `src/components/ExportMenu.tsx` — Dropdown menu with download options (CriticMarkup, clean, original) and copy to clipboard
 - `src/components/SourceView.tsx` — Collapsible panel showing syntax-highlighted CriticMarkup output with copy button

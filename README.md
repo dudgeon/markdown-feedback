@@ -8,7 +8,7 @@ Built for the workflow: LLM generates draft â†’ human edits with track changes â
 
 ## Status
 
-**Phase 3 complete** (import/export). Phase 4 (changes panel) is next. See [BACKLOG.md](BACKLOG.md) for the full roadmap.
+**Phase 4 complete** (changes panel). Phase 5 (annotation system) is next. See [BACKLOG.md](BACKLOG.md) for the full roadmap.
 
 ## How It Works
 

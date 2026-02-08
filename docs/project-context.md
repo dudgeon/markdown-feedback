@@ -233,3 +233,29 @@ The PRD (§3.5–3.6) specifies file picker import, paste import, drag-and-drop,
 ### Parser design
 
 The CriticMarkup parser (`parseCriticMarkup.ts`) uses a single-pass regex approach. It tokenizes the string into typed segments (original, deletion, insertion) with nanoid IDs and `pairedWith` links for substitutions. Comments (`{>>…<<}`) are silently stripped (Phase 5 will add comment support). The segments are then converted to TipTap-compatible HTML via `criticMarkupToHTML()`, which TipTap's `parseHTML` rules reconstruct into ProseMirror marks with the correct attributes.
+
+---
+
+## 10. Phase 4 Decisions: Changes Panel
+
+**Date:** 2026-02-08
+
+### Layout change
+
+The editor layout was refactored from a centered vertical stack (`max-w-4xl`) to a two-column layout (`max-w-7xl` with `flex`). Editor takes `flex-1` on the left, changes panel is fixed at `w-80` (~320px) on the right, source view spans full width below both.
+
+### Change extraction
+
+`extractChanges.ts` walks the ProseMirror doc tree using the same pattern as `serializeCriticMarkup.ts` — iterate blocks, collect segments with mark metadata, group by substitution pairing / adjacency. The key difference: it captures absolute ProseMirror positions (`from`/`to`) for scroll-to and extracts ~5 words of surrounding original text for context display.
+
+### Scope narrowing
+
+The PRD (§3.3) specifies uncommented change count, filter toggle (All / Uncommented only), and comment status per entry. These all depend on Phase 5 (Annotation System) and were deferred:
+
+- **Uncommented count in header** → deferred to Phase 5
+- **Filter toggle** → deferred to Phase 5
+- **Comment status per entry** → deferred to Phase 5
+
+### Scroll-to behavior
+
+Click-to-scroll uses `editor.commands.setTextSelection({ from, to })` + `scrollIntoView()` + `focus()`. The browser's native selection highlight provides visual feedback. A pulse/glow decoration was considered but deferred — the selection highlight is sufficient for now.

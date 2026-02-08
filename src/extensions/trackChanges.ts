@@ -242,9 +242,16 @@ export const TrackChanges = Extension.create({
         return true
       }
 
-      // Original text — mark as deleted instead of removing
+      // Original text — mark as deleted instead of removing.
+      // Reuse the ID of an adjacent standalone deletion so ProseMirror
+      // merges the marks into a single DOM span (avoids cursor dead zones).
+      const adjacentId = findAdjacentStandaloneDeletionId(state, charPos, charEnd)
       const tr = state.tr
-      tr.addMark(charPos, charEnd, deletionType.create({ id: nanoid(8) }))
+      tr.addMark(
+        charPos,
+        charEnd,
+        deletionType.create({ id: adjacentId ?? nanoid(8) })
+      )
       tr.setMeta('trackChangesProcessed', true)
       dispatch(tr)
       return true
@@ -323,6 +330,42 @@ export const TrackChanges = Extension.create({
       tr.setMeta('trackChangesProcessed', true)
       dispatch(tr)
       return true
+    }
+
+    /**
+     * Check for an adjacent standalone deletion mark and return its ID.
+     * "Standalone" means pairedWith === null (not part of a substitution).
+     * When found, reusing this ID causes ProseMirror to merge adjacent
+     * deletion marks into a single DOM span, preventing cursor dead zones.
+     */
+    function findAdjacentStandaloneDeletionId(
+      state: any,
+      charPos: number,
+      charEnd: number
+    ): string | null {
+      // Check the character immediately before charPos
+      if (charPos > 0) {
+        const $before = state.doc.resolve(charPos)
+        const nodeBefore = $before.nodeBefore
+        if (nodeBefore?.isText) {
+          const delMark = deletionType.isInSet(nodeBefore.marks)
+          if (delMark && delMark.attrs.pairedWith === null) {
+            return delMark.attrs.id
+          }
+        }
+      }
+      // Check the character immediately after charEnd
+      if (charEnd < state.doc.content.size) {
+        const $after = state.doc.resolve(charEnd)
+        const nodeAfter = $after.nodeAfter
+        if (nodeAfter?.isText) {
+          const delMark = deletionType.isInSet(nodeAfter.marks)
+          if (delMark && delMark.attrs.pairedWith === null) {
+            return delMark.attrs.id
+          }
+        }
+      }
+      return null
     }
 
     function collectTextRanges(
