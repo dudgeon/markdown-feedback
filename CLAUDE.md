@@ -96,7 +96,9 @@ If the repo is ever renamed, update `base` in `vite.config.ts` to match.
 
 ## Testing
 
-Always verify changes in the browser, not just with `tsc` or `npm run build`. Use the Chrome browser automation tools (`mcp__claude-in-chrome__*`) to:
+Always verify changes in the browser, not just with `tsc` or `npm run build`. **Important:** The user must type `@browser` in the chat to connect the Chrome browser tools. Remind them if browser testing is needed and the tools aren't responding.
+
+Use the Chrome browser automation tools (`mcp__claude-in-chrome__*`) to:
 1. Navigate to http://localhost:5173/markdown-feedback/
 2. Make edits (click, type, select+delete, select+type)
 3. Screenshot to verify visual styling
