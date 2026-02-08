@@ -65,8 +65,12 @@
 
 ## Known Issues & Tech Debt
 
-### Editor rendering
-- [ ] Ordered and unordered lists indent correctly but bullets/numbers don't render visually (TipTap recognizes the list structure but `list-style-type` is suppressed or missing in CSS)
+### Import parser (fixed)
+- [x] ~~Single-newline block separation drops content~~ — fixed: replaced naive `\n\n+` split with line-aware block grouper that treats headings as always-single-line blocks
+- [x] ~~YAML frontmatter not stripped on re-import~~ — fixed: `stripFrontmatter()` removes `--- ... ---` before parsing
+
+### Editor rendering (fixed)
+- [x] ~~Ordered/unordered list bullets/numbers don't render~~ — fixed: restored `list-style-type: disc`/`decimal` stripped by Tailwind preflight
 
 ### Serialization edge cases
 - [ ] Substitution over text that already contains old deletions — old deletions emit as standalone `{--…--}` outside the `{~~…~~}`, which is semantically correct but may look odd

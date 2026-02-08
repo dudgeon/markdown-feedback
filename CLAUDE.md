@@ -103,6 +103,21 @@ Always verify changes in the browser, not just with `tsc` or `npm run build`. Us
 
 Run `npm run build` (not just `tsc --noEmit`) to catch all TypeScript errors including unused variables.
 
+### Parser and Import Testing
+
+When writing or modifying parsers/importers, always test with **real-world input**, not just idealized samples:
+
+1. **Use `npx tsx -e`** to run quick inline tests against the parser with varied inputs before committing
+2. **Test round-trip**: export → re-import → verify the editor state matches. This catches frontmatter handling, encoding issues, and token fidelity problems.
+3. **Test with messy markdown**: single newlines between blocks, no trailing newline, mixed heading levels, lists immediately after headings, inline code containing CriticMarkup-like syntax
+4. **Test with content you didn't write**: paste from a real doc, a Claude conversation, or a README — not just the sample content you already know works
+
+Phase 3 shipped with two bugs (single-newline block separation dropping content, YAML frontmatter not stripped on re-import) that were caught on first real-world use. Both were knowable from the code — the failure was testing only the happy path with idealized input.
+
+### Tailwind CSS Resets
+
+Tailwind's preflight CSS strips browser defaults including `list-style-type`, `margin`, and `padding` on many elements. When styling TipTap editor content under `.tiptap`, explicitly restore any defaults that Tailwind removes (e.g., `list-style-type: disc` for `<ul>`, `list-style-type: decimal` for `<ol>`). Don't assume that setting `padding-left` alone is sufficient for list rendering.
+
 ## File Organization
 
 ### Repository Layout

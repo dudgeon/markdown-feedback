@@ -92,13 +92,15 @@ export function parseCriticMarkup(text: string): ParsedSegment[] {
  * Convert a CriticMarkup string to TipTap-compatible HTML.
  *
  * Handles:
- *   - Paragraph breaks (\n\n) → separate <p> or heading elements
+ *   - YAML frontmatter (--- ... ---) → stripped
+ *   - Paragraph breaks (blank lines) → separate elements
  *   - Heading prefixes (# , ## , ### ) → <h1>, <h2>, <h3>
+ *   - Headings are always single-line blocks (even with only \n after)
  *   - CriticMarkup tokens → <span> elements with tracked-change classes
  */
 export function criticMarkupToHTML(text: string): string {
-  // Split into blocks by double newline (paragraph boundary)
-  const blocks = text.split(/\n\n+/)
+  const stripped = stripFrontmatter(text)
+  const blocks = splitIntoBlocks(stripped)
   const htmlBlocks: string[] = []
 
   for (const block of blocks) {
@@ -126,6 +128,59 @@ export function criticMarkupToHTML(text: string): string {
   }
 
   return htmlBlocks.join('')
+}
+
+/**
+ * Strip YAML frontmatter (--- ... ---) from the start of a document.
+ * Handles the frontmatter that exportCriticMarkup() prepends.
+ */
+function stripFrontmatter(text: string): string {
+  const match = text.match(/^---\n[\s\S]*?\n---\n*/)
+  return match ? text.slice(match[0].length) : text
+}
+
+/**
+ * Split markdown text into blocks, handling:
+ * - Blank lines as paragraph separators
+ * - Headings as always-single-line blocks (even with only \n after them)
+ *
+ * This avoids the naive \n\n split which drops content when a heading
+ * is followed by body text with only a single newline.
+ */
+function splitIntoBlocks(text: string): string[] {
+  const lines = text.split('\n')
+  const blocks: string[] = []
+  let current: string[] = []
+
+  for (const line of lines) {
+    const isBlank = line.trim() === ''
+    const isHeading = /^#{1,3} /.test(line)
+
+    if (isBlank) {
+      // Blank line ends the current block
+      if (current.length > 0) {
+        blocks.push(current.join('\n'))
+        current = []
+      }
+    } else if (isHeading) {
+      // Headings are always their own block — flush any accumulated lines first
+      if (current.length > 0) {
+        blocks.push(current.join('\n'))
+        current = []
+      }
+      blocks.push(line)
+    } else {
+      // Non-blank, non-heading line — accumulate into current block
+      current.push(line)
+    }
+  }
+
+  // Flush remaining lines
+  if (current.length > 0) {
+    blocks.push(current.join('\n'))
+  }
+
+  return blocks
 }
 
 /** Convert a single parsed segment to an HTML string. */
