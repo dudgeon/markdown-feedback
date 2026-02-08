@@ -1,4 +1,4 @@
-# CriticMark Editor — Backlog & Roadmap
+# Markdown Feedback — Backlog & Roadmap
 
 ## Completed
 
@@ -12,15 +12,17 @@
 - [x] Editing within insertions works normally (no tracking)
 - [x] Browser-validated, no console errors
 
+### Phase 2: CriticMarkup Serialization + Source View
+- [x] Serialize editor state → CriticMarkup string (spans → `{++…++}`, `{--…--}`, `{~~…~>…~~}`)
+- [x] Collapsible source view panel (bottom, read-only, syntax-highlighted)
+- [x] Live update on edit (debounced ~500ms)
+- [x] Copy-to-clipboard button on source view
+- [x] GitHub Pages deployment (auto-deploy on push to main)
+- [x] Renamed app to "Markdown Feedback"
+
 ---
 
 ## Up Next
-
-### Phase 2: CriticMarkup Serialization + Source View
-- [ ] Serialize editor state → CriticMarkup string (spans → `{++…++}`, `{--…--}`, `{~~…~>…~~}`)
-- [ ] Collapsible source view panel (bottom, read-only, syntax-highlighted)
-- [ ] Live update on edit (debounced ~500ms)
-- [ ] Copy-to-clipboard button on source view
 
 ### Phase 3: Import / Export
 - [ ] File import via file picker (`.md` → all content as original status)

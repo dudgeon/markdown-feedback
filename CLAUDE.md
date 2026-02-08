@@ -4,11 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-CriticMark Editor — a web-based track-changes editor for markdown that intercepts edits in real-time and records them as CriticMarkup notation. Users edit LLM-generated documents; every change (insertion, deletion, substitution) is captured automatically with optional annotations.
+Markdown Feedback — a web-based track-changes editor for markdown that intercepts edits in real-time and records them as CriticMarkup notation. Users edit LLM-generated documents; every change (insertion, deletion, substitution) is captured automatically with optional annotations.
 
 Full specification lives in `docs/prd.md` and `docs/project-context.md`. Roadmap and feature backlog: `BACKLOG.md`.
 
-**Status:** Phase 1 COMPLETE (intercept spike validated). Next: Phase 2 (CriticMarkup serialization + source view).
+**Live:** https://dudgeon.github.io/markdown-feedback/
+
+**Status:** Phase 2 COMPLETE (serialization + source view). Next: Phase 3 (import/export).
 
 ## Commands
 
@@ -39,8 +41,11 @@ This project uses an intercept-based architecture, NOT a diff-based approach. Ev
   - `TrackedDeletion` mark — red strikethrough, `contenteditable=false`, non-inclusive
   - `TrackedInsertion` mark — green text, inclusive (extends when typing at edges)
   - `TrackChanges` extension — uses `handleKeyDown`, `handleTextInput`, and `handlePaste` to intercept edits directly (NOT `appendTransaction` — input handlers proved simpler and more reliable)
-- `src/components/Editor.tsx` — TipTap editor setup with sample content
-- `src/index.css` — Track changes visual styles (`.tracked-deletion`, `.tracked-insertion`) + TipTap editor styles
+- `src/utils/serializeCriticMarkup.ts` — Walks ProseMirror doc tree and emits CriticMarkup string. Handles standalone deletions/insertions and paired substitutions.
+- `src/components/Editor.tsx` — TipTap editor setup with serialization wiring and source view
+- `src/components/SourceView.tsx` — Collapsible panel showing syntax-highlighted CriticMarkup output with copy button
+- `src/hooks/useDebouncedValue.ts` — Generic debounce hook for source view updates
+- `src/index.css` — Track changes visual styles + source view syntax highlighting
 
 ### Intercept Behaviors
 
@@ -94,6 +99,9 @@ docs/                      # Specification & design documents
 src/                       # Application source code
   components/              # React components
   extensions/              # TipTap/ProseMirror extensions
+  hooks/                   # Custom React hooks
+  utils/                   # Pure utility functions
+.github/workflows/         # CI/CD (GitHub Pages deployment)
 ```
 
 ### Naming Conventions
@@ -102,7 +110,7 @@ src/                       # Application source code
 - **Docs folder:** lowercase, hyphen-separated, no project-name prefix (`prd.md` not `criticmark-prd-v2.md`)
 - **Source files:** camelCase for `.ts`/`.tsx` files, matching the default export name
 - **No version numbers in filenames.** Version history lives in git. Document status (if needed) goes in the document header, not the filename.
-- **No redundant prefixes.** Everything in this repo is CriticMark — don't prefix filenames with `criticmark-`.
+- **No redundant prefixes.** Don't prefix filenames with the project name.
 
 ### When Adding New Documents
 

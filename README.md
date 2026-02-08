@@ -1,12 +1,14 @@
-# CriticMark Editor
+# Markdown Feedback
 
 A web-based track-changes editor for markdown. Edit naturally — every deletion, insertion, and substitution is captured automatically as [CriticMarkup](http://criticmarkup.com/spec.php) notation.
 
-Built for the workflow: LLM generates draft → human edits in CriticMark → changes + annotations exported as portable `.md` → patterns analyzed to improve future drafts.
+Built for the workflow: LLM generates draft → human edits with track changes → changes + annotations exported as portable `.md` → patterns analyzed to improve future drafts.
+
+**Live:** https://dudgeon.github.io/markdown-feedback/
 
 ## Status
 
-**Phase 1 complete** (intercept spike validated). Phase 2 (CriticMarkup serialization + source view) is next. See [BACKLOG.md](BACKLOG.md) for the full roadmap.
+**Phase 2 complete** (CriticMarkup serialization + source view). Phase 3 (import/export) is next. See [BACKLOG.md](BACKLOG.md) for the full roadmap.
 
 ## How It Works
 

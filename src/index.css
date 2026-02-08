@@ -86,3 +86,24 @@ body {
 .tracked-deletion[data-paired] + .tracked-insertion[data-paired] {
   margin-left: 1px;
 }
+
+/* CriticMarkup source view syntax highlighting (dark background) */
+.cm-deletion {
+  color: #f87171;
+}
+
+.cm-insertion {
+  color: #4ade80;
+}
+
+.cm-substitution {
+  color: #fbbf24;
+}
+
+.cm-del-text {
+  color: #f87171;
+}
+
+.cm-ins-text {
+  color: #4ade80;
+}
