@@ -1,8 +1,13 @@
+import { useState, useRef, useEffect, useCallback } from 'react'
 import type { ChangeEntry } from '../utils/extractChanges'
 
 interface ChangesPanelProps {
   changes: ChangeEntry[]
   onScrollTo: (from: number, to: number) => void
+  onCommentChange: (id: string, text: string) => void
+  focusCommentId: string | null
+  onFocusHandled: () => void
+  onReturnToEditor: () => void
 }
 
 const TYPE_CONFIG = {
@@ -21,19 +26,34 @@ const TYPE_CONFIG = {
     barColor: 'bg-blue-500',
     badgeColor: 'bg-blue-100 text-blue-700',
   },
+  highlight: {
+    label: 'Comment',
+    barColor: 'bg-yellow-400',
+    badgeColor: 'bg-yellow-100 text-yellow-700',
+  },
 } as const
 
 export default function ChangesPanel({
   changes,
   onScrollTo,
+  onCommentChange,
+  focusCommentId,
+  onFocusHandled,
+  onReturnToEditor,
 }: ChangesPanelProps) {
+  const commentCount = changes.filter((c) => c.comment).length
+
   return (
     <div className="flex flex-col h-full">
       <div className="px-4 py-3 border-b border-gray-200 flex-shrink-0">
         <h2 className="text-sm font-semibold text-gray-900">
           {changes.length === 0
             ? 'No changes'
-            : `${changes.length} change${changes.length === 1 ? '' : 's'}`}
+            : `${changes.length} change${changes.length === 1 ? '' : 's'}${
+                commentCount > 0
+                  ? `, ${commentCount} comment${commentCount === 1 ? '' : 's'}`
+                  : ''
+              }`}
         </h2>
       </div>
 
@@ -50,6 +70,10 @@ export default function ChangesPanel({
               key={change.id + '-' + i}
               change={change}
               onScrollTo={onScrollTo}
+              onCommentChange={onCommentChange}
+              shouldFocus={focusCommentId === change.id}
+              onFocusHandled={onFocusHandled}
+              onReturnToEditor={onReturnToEditor}
             />
           ))}
         </div>
@@ -61,32 +85,132 @@ export default function ChangesPanel({
 function ChangeCard({
   change,
   onScrollTo,
+  onCommentChange,
+  shouldFocus,
+  onFocusHandled,
+  onReturnToEditor,
 }: {
   change: ChangeEntry
   onScrollTo: (from: number, to: number) => void
+  onCommentChange: (id: string, text: string) => void
+  shouldFocus: boolean
+  onFocusHandled: () => void
+  onReturnToEditor: () => void
 }) {
   const config = TYPE_CONFIG[change.type]
+  const [isEditing, setIsEditing] = useState(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const showInput = isEditing || shouldFocus
+
+  useEffect(() => {
+    if (shouldFocus && textareaRef.current) {
+      textareaRef.current.focus()
+      onFocusHandled()
+    }
+  }, [shouldFocus, onFocusHandled])
+
+  const handleBlur = useCallback(() => {
+    setIsEditing(false)
+    const val = textareaRef.current?.value.trim() ?? ''
+    onCommentChange(change.id, val)
+  }, [change.id, onCommentChange])
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === 'Tab') {
+        e.preventDefault()
+        handleBlur()
+        onReturnToEditor()
+      } else if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault()
+        handleBlur()
+        onReturnToEditor()
+      }
+    },
+    [handleBlur, onReturnToEditor]
+  )
 
   return (
-    <button
-      type="button"
-      onClick={() => onScrollTo(change.from, change.to)}
-      className="w-full text-left px-4 py-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors flex gap-3"
-    >
-      <div className={`w-1 flex-shrink-0 rounded-full ${config.barColor}`} />
+    <div className="border-b border-gray-100">
+      <button
+        type="button"
+        onClick={() => onScrollTo(change.from, change.to)}
+        className="w-full text-left px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors flex gap-3"
+      >
+        <div
+          className={`w-1 flex-shrink-0 rounded-full ${config.barColor}`}
+        />
 
-      <div className="flex-1 min-w-0">
-        <span
-          className={`inline-block text-xs font-medium px-1.5 py-0.5 rounded ${config.badgeColor} mb-1`}
+        <div className="flex-1 min-w-0">
+          <span
+            className={`inline-block text-xs font-medium px-1.5 py-0.5 rounded ${config.badgeColor} mb-1`}
+          >
+            {config.label}
+          </span>
+
+          <p className="text-sm text-gray-700 leading-snug">
+            <ContextSnippet change={change} />
+          </p>
+
+          {change.comment && !showInput && (
+            <p className="text-xs text-purple-600 mt-1.5 italic">
+              {change.comment}
+            </p>
+          )}
+        </div>
+      </button>
+
+      {showInput ? (
+        <div className="px-4 pb-3 pl-8">
+          <textarea
+            ref={textareaRef}
+            defaultValue={change.comment ?? ''}
+            placeholder="Add a comment..."
+            rows={2}
+            className="w-full text-xs border border-gray-200 rounded-md px-2 py-1.5 resize-none focus:outline-none focus:ring-1 focus:ring-purple-400 focus:border-purple-400"
+            onFocus={() => setIsEditing(true)}
+            onBlur={handleBlur}
+            onKeyDown={handleKeyDown}
+          />
+          <button
+            type="button"
+            onMouseDown={(e) => {
+              e.preventDefault()
+              handleBlur()
+              onReturnToEditor()
+            }}
+            className="mt-1 px-2 py-0.5 text-xs font-medium text-purple-600 bg-purple-50 border border-purple-200 rounded hover:bg-purple-100 cursor-pointer transition-colors"
+          >
+            Save
+          </button>
+        </div>
+      ) : change.comment ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            setIsEditing(true)
+            setTimeout(() => textareaRef.current?.focus(), 0)
+          }}
+          className="px-4 pb-2 pl-8 text-xs text-gray-400 hover:text-purple-500 cursor-pointer"
         >
-          {config.label}
-        </span>
-
-        <p className="text-sm text-gray-700 leading-snug">
-          <ContextSnippet change={change} />
-        </p>
-      </div>
-    </button>
+          Edit comment
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            setIsEditing(true)
+            setTimeout(() => textareaRef.current?.focus(), 0)
+          }}
+          className="px-4 pb-2 pl-8 text-xs text-gray-400 hover:text-purple-500 cursor-pointer"
+        >
+          + Comment
+        </button>
+      )}
+    </div>
   )
 }
 
@@ -126,6 +250,12 @@ function ChangeText({ change }: { change: ChangeEntry }) {
             {change.insertedText}
           </span>
         </>
+      )
+    case 'highlight':
+      return (
+        <span className="bg-yellow-100 border-b border-yellow-400 rounded-sm px-0.5">
+          {change.highlightedText}
+        </span>
       )
   }
 }

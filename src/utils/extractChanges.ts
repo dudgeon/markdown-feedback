@@ -1,10 +1,12 @@
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
 
 export interface ChangeEntry {
-  type: 'deletion' | 'insertion' | 'substitution'
+  type: 'deletion' | 'insertion' | 'substitution' | 'highlight'
   id: string
   deletedText?: string
   insertedText?: string
+  highlightedText?: string
+  comment?: string
   contextBefore: string
   contextAfter: string
   from: number
@@ -15,6 +17,7 @@ interface PositionedSegment {
   text: string
   isDeletion: boolean
   isInsertion: boolean
+  isHighlight: boolean
   id: string | null
   pairedWith: string | null
   from: number
@@ -22,12 +25,18 @@ interface PositionedSegment {
 }
 
 /**
- * Extract all tracked changes from a ProseMirror document.
+ * Extract all tracked changes and highlights from a ProseMirror document.
  *
  * Walks the doc tree (same pattern as serializeCriticMarkup) and returns
  * a list of changes with type, text, context, and positions for scrollTo.
+ *
+ * If a comments Record is provided, comment text is merged into each entry
+ * by matching change/highlight IDs.
  */
-export function extractChanges(doc: ProseMirrorNode): ChangeEntry[] {
+export function extractChanges(
+  doc: ProseMirrorNode,
+  comments: Record<string, string> = {}
+): ChangeEntry[] {
   const changes: ChangeEntry[] = []
 
   doc.forEach((blockNode, blockOffset) => {
@@ -36,6 +45,13 @@ export function extractChanges(doc: ProseMirrorNode): ChangeEntry[] {
     const blockChanges = groupSegmentsIntoChanges(segments)
     changes.push(...blockChanges)
   })
+
+  // Merge comments into entries
+  for (const change of changes) {
+    if (comments[change.id]) {
+      change.comment = comments[change.id]
+    }
+  }
 
   return changes
 }
@@ -52,12 +68,14 @@ function collectPositionedSegments(
 
     const delMark = node.marks.find((m) => m.type.name === 'trackedDeletion')
     const insMark = node.marks.find((m) => m.type.name === 'trackedInsertion')
+    const hlMark = node.marks.find((m) => m.type.name === 'trackedHighlight')
 
     segments.push({
       text: node.text,
       isDeletion: !!delMark,
       isInsertion: !!insMark,
-      id: delMark?.attrs.id ?? insMark?.attrs.id ?? null,
+      isHighlight: !!hlMark,
+      id: delMark?.attrs.id ?? insMark?.attrs.id ?? hlMark?.attrs.id ?? null,
       pairedWith:
         delMark?.attrs.pairedWith ?? insMark?.attrs.pairedWith ?? null,
       from: basePos + nodeOffset,
@@ -78,13 +96,44 @@ function groupSegmentsIntoChanges(
   for (let i = 0; i < segments.length; i++) {
     const seg = segments[i]
 
-    // Skip original text
-    if (!seg.isDeletion && !seg.isInsertion) continue
+    // Skip original text (no marks)
+    if (!seg.isDeletion && !seg.isInsertion && !seg.isHighlight) continue
 
     // Skip insertions already consumed by a substitution
     if (seg.isInsertion && seg.id && consumedInsertionIds.has(seg.id)) continue
 
-    if (seg.isDeletion && seg.pairedWith) {
+    if (seg.isHighlight) {
+      // Highlight — merge adjacent with same ID
+      let hlText = seg.text
+      const hlFrom = seg.from
+      let hlTo = seg.to
+      let j = i + 1
+
+      while (
+        j < segments.length &&
+        segments[j].isHighlight &&
+        segments[j].id === seg.id
+      ) {
+        hlText += segments[j].text
+        hlTo = segments[j].to
+        j++
+      }
+
+      const contextBefore = getContextBefore(segments, i, 5)
+      const contextAfter = getContextAfter(segments, j, 5)
+
+      changes.push({
+        type: 'highlight',
+        id: seg.id ?? '',
+        highlightedText: hlText,
+        contextBefore,
+        contextAfter,
+        from: hlFrom,
+        to: hlTo,
+      })
+
+      i = j - 1
+    } else if (seg.isDeletion && seg.pairedWith) {
       // Substitution — collect deletion text and find paired insertion
       const pairedInsId = seg.pairedWith
       let delText = ''
@@ -211,7 +260,7 @@ function getContextBefore(
 ): string {
   let text = ''
   for (let i = idx - 1; i >= 0; i--) {
-    if (!segments[i].isDeletion && !segments[i].isInsertion) {
+    if (!segments[i].isDeletion && !segments[i].isInsertion && !segments[i].isHighlight) {
       text = segments[i].text + text
     }
   }
@@ -226,7 +275,7 @@ function getContextAfter(
 ): string {
   let text = ''
   for (let i = idx; i < segments.length; i++) {
-    if (!segments[i].isDeletion && !segments[i].isInsertion) {
+    if (!segments[i].isDeletion && !segments[i].isInsertion && !segments[i].isHighlight) {
       text += segments[i].text
     }
   }

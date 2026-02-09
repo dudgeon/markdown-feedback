@@ -34,6 +34,18 @@ function highlightCriticMarkup(text: string): string {
     '<span class="cm-insertion">{++$1++}</span>'
   )
 
+  // Highlights: {==text==}
+  html = html.replace(
+    /\{==(.+?)==\}/g,
+    '<span class="cm-highlight">{==$1==}</span>'
+  )
+
+  // Comments: {>>text<<} (note: > and < are escaped)
+  html = html.replace(
+    /\{&gt;&gt;(.+?)&lt;&lt;\}/g,
+    '<span class="cm-comment">{&gt;&gt;$1&lt;&lt;}</span>'
+  )
+
   return html
 }
 

@@ -10,7 +10,7 @@ Full specification lives in `docs/prd.md` and `docs/project-context.md`. Roadmap
 
 **Live:** https://dudgeon.github.io/markdown-feedback/
 
-**Status:** Phase 4 COMPLETE (changes panel). Next: Phase 5 (annotation system).
+**Status:** Phase 5 COMPLETE (annotation system). Next: Phase 6 (session persistence + undo).
 
 ## Commands
 
@@ -40,13 +40,14 @@ This project uses an intercept-based architecture, NOT a diff-based approach. Ev
 - `src/extensions/trackChanges.ts` — Core of the system. Contains:
   - `TrackedDeletion` mark — red strikethrough, `contenteditable=false`, non-inclusive
   - `TrackedInsertion` mark — green text, inclusive (extends when typing at edges)
-  - `TrackChanges` extension — uses `handleKeyDown`, `handleTextInput`, and `handlePaste` to intercept edits directly (NOT `appendTransaction` — input handlers proved simpler and more reliable)
-- `src/utils/serializeCriticMarkup.ts` — Walks ProseMirror doc tree and emits CriticMarkup string. Key design: `pairedWith !== null` distinguishes substitution parts from standalone changes. Standalone deletions each get unique nanoid IDs (merge by adjacency, not ID). Substitution deletions share the same `id`/`pairedWith` pair.
-- `src/utils/parseCriticMarkup.ts` — Reverse of serializer. `parseCriticMarkup()` tokenizes a CriticMarkup string into typed segments; `criticMarkupToHTML()` converts those segments into TipTap-compatible HTML with tracked-change spans. Used for both paste import and initial sample content loading.
-- `src/utils/exportDocument.ts` — Export functions: `exportCriticMarkup()` (YAML frontmatter + markup), `exportClean()` (accept all changes), `exportOriginal()` (reject all changes), `countChanges()`, `downloadFile()`.
-- `src/utils/extractChanges.ts` — Walks ProseMirror doc tree and extracts a structured `ChangeEntry[]` list with type, text, context snippets, and positions. Same walk pattern as serializer but captures absolute positions for scroll-to and surrounding original text for context display.
-- `src/components/Editor.tsx` — TipTap editor setup with two-column layout (editor left, changes panel right), toolbar (Import + Export), serialization wiring, and source view
-- `src/components/ChangesPanel.tsx` — Right sidebar listing all tracked changes in document order. Shows change type badge (Deleted/Inserted/Replaced), context snippets with inline highlighting, and click-to-scroll.
+  - `TrackedHighlight` mark — yellow highlight for standalone comments, non-inclusive
+  - `TrackChanges` extension — uses `handleKeyDown`, `handleTextInput`, and `handlePaste` to intercept edits directly. Also handles Tab-to-comment (when cursor is on a change) and Cmd+Shift+H to create highlights.
+- `src/utils/serializeCriticMarkup.ts` — Walks ProseMirror doc tree and emits CriticMarkup string. Accepts a `comments` Record to emit `{>>comment<<}` after changes and `{==text==}{>>comment<<}` for highlights. Key design: `pairedWith !== null` distinguishes substitution parts from standalone changes.
+- `src/utils/parseCriticMarkup.ts` — Reverse of serializer. `parseCriticMarkup()` tokenizes a CriticMarkup string into typed segments including highlights and comments; `criticMarkupToHTML()` returns `{ html, comments }` — the HTML with tracked-change spans, and a Record mapping change IDs to comment text. `extractCommentsFromSegments()` links comment tokens to their preceding change/highlight.
+- `src/utils/exportDocument.ts` — Export functions: `exportCriticMarkup()` (YAML frontmatter + markup), `exportClean()` (accept all changes), `exportOriginal()` (reject all changes), `countChanges()`, `downloadFile()`. Both clean and original exports strip `{==...==}` highlight markers.
+- `src/utils/extractChanges.ts` — Walks ProseMirror doc tree and extracts a structured `ChangeEntry[]` list with type (deletion/insertion/substitution/highlight), text, context snippets, positions, and optional comment text. Accepts a `comments` Record to merge into entries.
+- `src/components/Editor.tsx` — TipTap editor setup with two-column layout, toolbar, serialization wiring, source view, and comment state management. Comments live in React state as `Record<string, string>` (keyed by change/highlight ID). Orphaned comments are pruned on every editor update. Custom events bridge the TrackChanges plugin keyboard shortcuts to React state.
+- `src/components/ChangesPanel.tsx` — Right sidebar listing all tracked changes and highlights in document order. Shows change type badge, context snippets with inline highlighting, click-to-scroll, and per-entry comment input (auto-save on blur, Tab/Enter to save and return to editor).
 - `src/components/ImportModal.tsx` — Paste import modal. Content is always parsed for CriticMarkup tokens (no "Start fresh" vs "Resume editing" prompt — the planned rebaseline feature handles clearing markup).
 - `src/components/ExportMenu.tsx` — Dropdown menu with download options (CriticMarkup, clean, original) and copy to clipboard
 - `src/components/SourceView.tsx` — Collapsible panel showing syntax-highlighted CriticMarkup output with copy button
@@ -67,6 +68,9 @@ Import always parses CriticMarkup tokens — there is no "Start fresh" vs "Resum
 | Edit within insertion | Normal edit (user refining their own addition) |
 | Delete within insertion | Truly removes characters |
 | Backspace/Delete on already-deleted text | Cursor skips over the deletion span |
+| Tab on a tracked change | Focus comment input in Changes Panel for that change |
+| Tab on normal text | Normal behavior (indent/default) |
+| Cmd+Shift+H with text selected | Apply highlight mark, focus comment input |
 
 ### CriticMarkup Syntax (Target Output)
 
@@ -75,6 +79,7 @@ Import always parses CriticMarkup tokens — there is no "Start fresh" vs "Resum
 {--removed text--}       — Deletions
 {~~old~>new~~}           — Substitutions
 {>>comment text<<}       — Comments (immediately after change)
+{==highlighted text==}   — Highlights (standalone comment target)
 ```
 
 ## Environment

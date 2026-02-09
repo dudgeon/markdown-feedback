@@ -35,14 +35,16 @@ export function exportCriticMarkup(
  * - {++text++}      → text  (keep insertions)
  * - {--text--}      → ""    (remove deletions)
  * - {~~old~>new~~}  → new   (keep replacement)
+ * - {==text==}      → text  (strip highlight markers, keep text)
  * - {>>comment<<}   → ""    (strip comments)
  */
 export function exportClean(markup: string): string {
   let result = markup
   // Substitutions first (before standalone deletion/insertion patterns)
   result = result.replace(/\{~~[\s\S]+?~>([\s\S]*?)~~\}/g, '$1')
-  result = result.replace(/\{--[\s\S]+?--\}/g, '')
+  result = result.replace(/\{--([\s\S]+?)--\}/g, '')
   result = result.replace(/\{\+\+([\s\S]+?)\+\+\}/g, '$1')
+  result = result.replace(/\{==([\s\S]+?)==\}/g, '$1')
   result = result.replace(/\{>>[\s\S]+?<<\}/g, '')
   return result
 }
@@ -53,6 +55,7 @@ export function exportClean(markup: string): string {
  * - {++text++}      → ""    (remove insertions)
  * - {--text--}      → text  (restore deletions)
  * - {~~old~>new~~}  → old   (keep original)
+ * - {==text==}      → text  (strip highlight markers, keep text)
  * - {>>comment<<}   → ""    (strip comments)
  */
 export function exportOriginal(markup: string): string {
@@ -61,6 +64,7 @@ export function exportOriginal(markup: string): string {
   result = result.replace(/\{~~([\s\S]+?)~>[\s\S]*?~~\}/g, '$1')
   result = result.replace(/\{--([\s\S]+?)--\}/g, '$1')
   result = result.replace(/\{\+\+[\s\S]+?\+\+\}/g, '')
+  result = result.replace(/\{==([\s\S]+?)==\}/g, '$1')
   result = result.replace(/\{>>[\s\S]+?<<\}/g, '')
   return result
 }

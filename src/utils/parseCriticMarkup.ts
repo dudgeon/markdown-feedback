@@ -2,7 +2,7 @@ import { nanoid } from 'nanoid'
 
 export interface ParsedSegment {
   text: string
-  type: 'original' | 'deletion' | 'insertion'
+  type: 'original' | 'deletion' | 'insertion' | 'highlight' | 'comment'
   id?: string
   pairedWith?: string
 }
@@ -12,18 +12,19 @@ export interface ParsedSegment {
  *
  * Tokens:
  *   {~~old~>new~~}  → substitution (paired deletion + insertion)
+ *   {==text==}      → highlight (standalone comment target)
  *   {--text--}      → deletion
  *   {++text++}      → insertion
- *   {>>comment<<}   → stripped (Phase 5)
+ *   {>>comment<<}   → comment (linked to preceding change/highlight)
  *   everything else → original text
  */
 export function parseCriticMarkup(text: string): ParsedSegment[] {
   const segments: ParsedSegment[] = []
 
   // Combined regex matching all CriticMarkup tokens.
-  // Order matters: substitution before deletion/insertion so {~~ is matched first.
+  // Order matters: substitution first, then highlight, then deletion/insertion, then comment.
   const tokenRe =
-    /\{~~([\s\S]+?)~>([\s\S]*?)~~\}|\{--([\s\S]+?)--\}|\{\+\+([\s\S]+?)\+\+\}|\{>>([\s\S]+?)<<\}/g
+    /\{~~([\s\S]+?)~>([\s\S]*?)~~\}|\{==([\s\S]+?)==\}|\{--([\s\S]+?)--\}|\{\+\+([\s\S]+?)\+\+\}|\{>>([\s\S]+?)<<\}/g
 
   let lastIndex = 0
   let match: RegExpExecArray | null
@@ -58,21 +59,33 @@ export function parseCriticMarkup(text: string): ParsedSegment[] {
         })
       }
     } else if (match[3] !== undefined) {
-      // Deletion: {--text--}
+      // Highlight: {==text==}
       segments.push({
         text: match[3],
-        type: 'deletion',
+        type: 'highlight',
         id: nanoid(8),
       })
     } else if (match[4] !== undefined) {
-      // Insertion: {++text++}
+      // Deletion: {--text--}
       segments.push({
         text: match[4],
+        type: 'deletion',
+        id: nanoid(8),
+      })
+    } else if (match[5] !== undefined) {
+      // Insertion: {++text++}
+      segments.push({
+        text: match[5],
         type: 'insertion',
         id: nanoid(8),
       })
+    } else if (match[6] !== undefined) {
+      // Comment: {>>text<<}
+      segments.push({
+        text: match[6],
+        type: 'comment',
+      })
     }
-    // match[5] = comment → silently strip
 
     lastIndex = match.index + match[0].length
   }
@@ -89,7 +102,41 @@ export function parseCriticMarkup(text: string): ParsedSegment[] {
 }
 
 /**
- * Convert a CriticMarkup string to TipTap-compatible HTML.
+ * Extract comments from parsed segments by linking each comment to the
+ * preceding change or highlight segment.
+ *
+ * Returns a Record mapping change/highlight IDs to comment text.
+ */
+export function extractCommentsFromSegments(
+  segments: ParsedSegment[]
+): Record<string, string> {
+  const comments: Record<string, string> = {}
+
+  for (let i = 0; i < segments.length; i++) {
+    if (segments[i].type !== 'comment') continue
+
+    // Scan backwards for the nearest change/highlight segment
+    for (let j = i - 1; j >= 0; j--) {
+      const prev = segments[j]
+      if (
+        prev.id &&
+        (prev.type === 'deletion' ||
+          prev.type === 'insertion' ||
+          prev.type === 'highlight')
+      ) {
+        // For substitutions, link to the insertion (it's the last segment of the pair)
+        // For standalone changes/highlights, link to the segment's own ID
+        comments[prev.id] = segments[i].text
+        break
+      }
+    }
+  }
+
+  return comments
+}
+
+/**
+ * Convert a CriticMarkup string to TipTap-compatible HTML and extract comments.
  *
  * Handles:
  *   - YAML frontmatter (--- ... ---) → stripped
@@ -97,11 +144,16 @@ export function parseCriticMarkup(text: string): ParsedSegment[] {
  *   - Heading prefixes (# , ## , ### ) → <h1>, <h2>, <h3>
  *   - Headings are always single-line blocks (even with only \n after)
  *   - CriticMarkup tokens → <span> elements with tracked-change classes
+ *   - Comments → extracted into Record, not rendered as HTML
  */
-export function criticMarkupToHTML(text: string): string {
+export function criticMarkupToHTML(text: string): {
+  html: string
+  comments: Record<string, string>
+} {
   const stripped = stripFrontmatter(text)
   const blocks = splitIntoBlocks(stripped)
   const htmlBlocks: string[] = []
+  const allComments: Record<string, string> = {}
 
   for (const block of blocks) {
     if (!block.trim()) continue
@@ -122,12 +174,14 @@ export function criticMarkupToHTML(text: string): string {
 
     // Parse CriticMarkup tokens within this block
     const segments = parseCriticMarkup(content)
+    const blockComments = extractCommentsFromSegments(segments)
+    Object.assign(allComments, blockComments)
     const inner = segments.map(segmentToHTML).join('')
 
     htmlBlocks.push(`<${tag}>${inner}</${tag}>`)
   }
 
-  return htmlBlocks.join('')
+  return { html: htmlBlocks.join(''), comments: allComments }
 }
 
 /**
@@ -200,6 +254,11 @@ function segmentToHTML(seg: ParsedSegment): string {
         : ''
       return `<span class="tracked-insertion" data-id="${seg.id}"${paired}>${escaped}</span>`
     }
+    case 'highlight':
+      return `<span class="tracked-highlight" data-id="${seg.id}">${escaped}</span>`
+    case 'comment':
+      // Comments don't render as HTML — they're metadata extracted separately
+      return ''
     default:
       return escaped
   }

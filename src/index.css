@@ -88,6 +88,12 @@ body {
   border-radius: 1px;
 }
 
+.tracked-highlight {
+  background-color: #fef9c3;
+  border-bottom: 2px solid #facc15;
+  border-radius: 1px;
+}
+
 /* Substitution visual connector — adjacent deletion+insertion */
 .tracked-deletion[data-paired] + .tracked-insertion[data-paired] {
   margin-left: 1px;
@@ -112,4 +118,12 @@ body {
 
 .cm-ins-text {
   color: #4ade80;
+}
+
+.cm-highlight {
+  color: #facc15;
+}
+
+.cm-comment {
+  color: #a78bfa;
 }

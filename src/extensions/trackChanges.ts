@@ -48,6 +48,38 @@ export const TrackedDeletion = Mark.create({
 })
 
 /**
+ * Mark: tracked-highlight
+ * Applied to unchanged text that the user wants to comment on (standalone comment).
+ * Displayed as yellow highlight. The comment text lives in external React state,
+ * keyed by this mark's `id` attribute.
+ * Serialized as {==highlighted text==}{>>comment<<} in CriticMarkup.
+ */
+export const TrackedHighlight = Mark.create({
+  name: 'trackedHighlight',
+
+  addAttributes() {
+    return {
+      id: {
+        default: null,
+        parseHTML: (el) => el.getAttribute('data-id'),
+        renderHTML: (attrs) => ({ 'data-id': attrs.id }),
+      },
+    }
+  },
+
+  parseHTML() {
+    return [{ tag: 'span.tracked-highlight' }]
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return ['span', { ...HTMLAttributes, class: 'tracked-highlight' }, 0]
+  },
+
+  // Highlight should not extend when typing at edges
+  inclusive: false,
+})
+
+/**
  * Mark: tracked-insertion
  * Applied to text that the user added to the document.
  * Displayed as green text. Editable — the user can continue refining their additions.
@@ -96,6 +128,7 @@ export const TrackChanges = Extension.create({
   addProseMirrorPlugins() {
     const deletionType = this.editor.schema.marks.trackedDeletion
     const insertionType = this.editor.schema.marks.trackedInsertion
+    const highlightType = this.editor.schema.marks.trackedHighlight
 
     return [
       new Plugin({
@@ -106,6 +139,35 @@ export const TrackChanges = Extension.create({
             const { state } = view
             const { selection } = state
             const { from, to, empty } = selection
+
+            // Cmd+Shift+H (Mac) / Ctrl+Shift+H (Win): create highlight
+            if (
+              event.key === 'h' &&
+              event.shiftKey &&
+              (event.metaKey || event.ctrlKey) &&
+              from !== to
+            ) {
+              event.preventDefault()
+              window.dispatchEvent(
+                new CustomEvent('trackchanges:create-highlight')
+              )
+              return true
+            }
+
+            // Tab: jump to comment input if cursor is on/adjacent to a change
+            if (event.key === 'Tab' && !event.shiftKey && !event.metaKey && !event.ctrlKey) {
+              const changeId = findChangeIdAtCursor(state, from, deletionType, insertionType, highlightType)
+              if (changeId) {
+                event.preventDefault()
+                window.dispatchEvent(
+                  new CustomEvent('trackchanges:tab-to-comment', {
+                    detail: { changeId },
+                  })
+                )
+                return true
+              }
+              return false // Let Tab function normally
+            }
 
             if (event.key !== 'Backspace' && event.key !== 'Delete') {
               return false
@@ -396,6 +458,105 @@ export const TrackChanges = Extension.create({
       })
 
       return ranges
+    }
+
+    /**
+     * Find the ID of a tracked change (deletion, insertion, or highlight)
+     * at or adjacent to the given cursor position.
+     * Returns null if the cursor is not on or next to any change.
+     *
+     * For substitution marks, always returns the deletion's ID (which is what
+     * extractChanges uses as the ChangeEntry ID). Paired insertions have
+     * pairedWith = delId, so we return that instead of the insertion's own ID.
+     */
+    function isChangeMark(
+      mark: any,
+      delType: typeof deletionType,
+      insType: typeof insertionType,
+      hlType: typeof highlightType
+    ): boolean {
+      return mark.type === delType || mark.type === insType || mark.type === hlType
+    }
+
+    /** Return the ChangeEntry-compatible ID for a mark. */
+    function resolveChangeId(mark: any, insType: typeof insertionType): string {
+      // Paired insertion → return the deletion's ID (= mark.attrs.pairedWith)
+      if (mark.type === insType && mark.attrs.pairedWith) {
+        return mark.attrs.pairedWith
+      }
+      return mark.attrs.id
+    }
+
+    function findChangeIdAtCursor(
+      state: any,
+      pos: number,
+      delType: typeof deletionType,
+      insType: typeof insertionType,
+      hlType: typeof highlightType
+    ): string | null {
+      const $pos = state.doc.resolve(pos)
+
+      // Check marks at the cursor position
+      for (const mark of $pos.marks()) {
+        if (isChangeMark(mark, delType, insType, hlType)) {
+          return resolveChangeId(mark, insType)
+        }
+      }
+
+      // Check the node immediately before the cursor
+      const nodeBefore = $pos.nodeBefore
+      if (nodeBefore?.isText) {
+        for (const mark of nodeBefore.marks) {
+          if (isChangeMark(mark, delType, insType, hlType)) {
+            return resolveChangeId(mark, insType)
+          }
+        }
+      }
+
+      // Check the node immediately after the cursor
+      const nodeAfter = $pos.nodeAfter
+      if (nodeAfter?.isText) {
+        for (const mark of nodeAfter.marks) {
+          if (isChangeMark(mark, delType, insType, hlType)) {
+            return resolveChangeId(mark, insType)
+          }
+        }
+      }
+
+      // When clicking on a contenteditable=false deletion span, the browser
+      // often places the cursor 1 char into the adjacent text node.
+      // Check the previous/next sibling inline node if we're near a boundary.
+      const textOffset = $pos.textOffset
+      const index = $pos.index($pos.depth)
+      const parent = $pos.parent
+
+      if (textOffset <= 1 && index > 0) {
+        const prevChild = parent.child(index - 1)
+        if (prevChild.isText) {
+          for (const mark of prevChild.marks) {
+            if (isChangeMark(mark, delType, insType, hlType)) {
+              return resolveChangeId(mark, insType)
+            }
+          }
+        }
+      }
+
+      const nodeAfterFull = $pos.nodeAfter
+      if (nodeAfterFull?.isText) {
+        const remainingLen = nodeAfterFull.nodeSize - textOffset
+        if (remainingLen <= 1 && index < parent.childCount - 1) {
+          const nextChild = parent.child(index + 1)
+          if (nextChild.isText) {
+            for (const mark of nextChild.marks) {
+              if (isChangeMark(mark, delType, insType, hlType)) {
+                return resolveChangeId(mark, insType)
+              }
+            }
+          }
+        }
+      }
+
+      return null
     }
   },
 })

@@ -4,6 +4,7 @@ interface Segment {
   text: string
   isDeletion: boolean
   isInsertion: boolean
+  isHighlight: boolean
   id: string | null
   pairedWith: string | null
 }
@@ -15,14 +16,19 @@ interface Segment {
  *   {--deleted text--}       standalone deletions
  *   {++inserted text++}      standalone insertions
  *   {~~old text~>new text~~} substitutions (paired deletion + insertion)
+ *   {==highlighted text==}   highlights (standalone comment targets)
+ *   {>>comment text<<}       comments (from external Record, after their change/highlight)
  */
-export function serializeCriticMarkup(doc: ProseMirrorNode): string {
+export function serializeCriticMarkup(
+  doc: ProseMirrorNode,
+  comments: Record<string, string> = {}
+): string {
   const blocks: string[] = []
 
   doc.forEach((blockNode) => {
     const prefix = getBlockPrefix(blockNode)
     const segments = collectSegments(blockNode)
-    const markup = serializeSegments(segments)
+    const markup = serializeSegments(segments, comments)
     blocks.push(prefix + markup)
   })
 
@@ -38,12 +44,14 @@ function collectSegments(blockNode: ProseMirrorNode): Segment[] {
 
     const delMark = node.marks.find((m) => m.type.name === 'trackedDeletion')
     const insMark = node.marks.find((m) => m.type.name === 'trackedInsertion')
+    const hlMark = node.marks.find((m) => m.type.name === 'trackedHighlight')
 
     segments.push({
       text: node.text,
       isDeletion: !!delMark,
       isInsertion: !!insMark,
-      id: delMark?.attrs.id ?? insMark?.attrs.id ?? null,
+      isHighlight: !!hlMark,
+      id: delMark?.attrs.id ?? insMark?.attrs.id ?? hlMark?.attrs.id ?? null,
       pairedWith: delMark?.attrs.pairedWith ?? insMark?.attrs.pairedWith ?? null,
     })
   })
@@ -51,11 +59,22 @@ function collectSegments(blockNode: ProseMirrorNode): Segment[] {
   return segments
 }
 
+/** Append a comment suffix if the given ID has a comment in the Record. */
+function commentSuffix(id: string | null, comments: Record<string, string>): string {
+  if (!id || !comments[id]) return ''
+  return `{>>${comments[id]}<<}`
+}
+
 /** Convert a flat array of segments into a CriticMarkup string. */
-function serializeSegments(segments: Segment[]): string {
+function serializeSegments(
+  segments: Segment[],
+  comments: Record<string, string>
+): string {
   let result = ''
   // Track insertion IDs that have been consumed by a substitution
   const consumedInsertionIds = new Set<string>()
+  // Track IDs whose comments have already been emitted
+  const emittedCommentIds = new Set<string>()
 
   for (let i = 0; i < segments.length; i++) {
     const seg = segments[i]
@@ -65,7 +84,24 @@ function serializeSegments(segments: Segment[]): string {
       continue
     }
 
-    if (seg.isDeletion && seg.pairedWith) {
+    if (seg.isHighlight) {
+      // Highlight — merge adjacent highlights with the same ID
+      let hlText = seg.text
+      const hlId = seg.id
+      while (
+        i + 1 < segments.length &&
+        segments[i + 1].isHighlight &&
+        segments[i + 1].id === hlId
+      ) {
+        i++
+        hlText += segments[i].text
+      }
+      result += `{==${hlText}==}`
+      if (hlId) {
+        result += commentSuffix(hlId, comments)
+        emittedCommentIds.add(hlId)
+      }
+    } else if (seg.isDeletion && seg.pairedWith) {
       // Substitution deletion — collect all deletion text for this pairedWith group,
       // then find the paired insertion
       const pairedInsId = seg.pairedWith
@@ -76,6 +112,17 @@ function serializeSegments(segments: Segment[]): string {
         consumedInsertionIds
       )
       result += `{~~${delText}~>${insText}~~}`
+      // Emit comment for the substitution (keyed by deletion ID or insertion ID)
+      const subId = seg.id ?? pairedInsId
+      if (subId) {
+        // Check both the deletion ID and insertion ID for comments
+        const delComment = seg.id ? commentSuffix(seg.id, comments) : ''
+        const insComment = commentSuffix(pairedInsId, comments)
+        const comment = delComment || insComment
+        result += comment
+        if (seg.id) emittedCommentIds.add(seg.id)
+        emittedCommentIds.add(pairedInsId)
+      }
       // Skip remaining deletion segments in this group
       while (
         i + 1 < segments.length &&
@@ -87,6 +134,7 @@ function serializeSegments(segments: Segment[]): string {
     } else if (seg.isDeletion) {
       // Standalone deletion — merge with adjacent standalone deletions
       let delText = seg.text
+      const delId = seg.id
       while (
         i + 1 < segments.length &&
         segments[i + 1].isDeletion &&
@@ -96,9 +144,14 @@ function serializeSegments(segments: Segment[]): string {
         delText += segments[i].text
       }
       result += `{--${delText}--}`
+      if (delId) {
+        result += commentSuffix(delId, comments)
+        emittedCommentIds.add(delId)
+      }
     } else if (seg.isInsertion) {
       // Standalone insertion — merge with adjacent standalone insertions
       let insText = seg.text
+      const insId = seg.id
       while (
         i + 1 < segments.length &&
         segments[i + 1].isInsertion &&
@@ -109,6 +162,10 @@ function serializeSegments(segments: Segment[]): string {
         insText += segments[i].text
       }
       result += `{++${insText}++}`
+      if (insId) {
+        result += commentSuffix(insId, comments)
+        emittedCommentIds.add(insId)
+      }
     } else {
       // Original text
       result += seg.text
