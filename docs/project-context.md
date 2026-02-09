@@ -259,3 +259,41 @@ The PRD (§3.3) specifies uncommented change count, filter toggle (All / Uncomme
 ### Scroll-to behavior
 
 Click-to-scroll uses `editor.commands.setTextSelection({ from, to })` + `scrollIntoView()` + `focus()`. The browser's native selection highlight provides visual feedback. A pulse/glow decoration was considered but deferred — the selection highlight is sufficient for now.
+
+---
+
+## 11. Phase 7 Research: DOCX Import
+
+**Date:** 2026-02-09
+
+### The problem
+
+Google Docs has a good "Suggesting" mode that captures proposed changes and lets authors add comments. When exported as `.docx`, these suggestions are preserved as standard OOXML tracked changes (`<w:ins>`, `<w:del>`) and comments are preserved as OOXML comment ranges. This makes `.docx` a reliable transport format for tracked edits from Google Docs into Markdown Feedback.
+
+### Architecture decision: JSZip + DOMParser (not mammoth, not pandoc)
+
+We evaluated several approaches:
+
+| Approach | Verdict | Why |
+|----------|---------|-----|
+| **mammoth.js** (docx → HTML) | Rejected | Does not preserve tracked changes — silently accepts all and outputs "final" doc. The entire point of import is the tracked changes. |
+| **pandoc via WASM** | Rejected | pandoc has excellent track-change support (`--track-changes=all` outputs CriticMarkup), but the WASM build is experimental, ~10+ MB, and unreliable in browsers. Can't work from GitHub Pages. |
+| **`docx` npm package** | Rejected | Write-only library for creating .docx files. Cannot read/parse existing files. |
+| **JSZip + fast-xml-parser** | Partially accepted | JSZip for ZIP extraction is correct. But fast-xml-parser (~35 KB) is unnecessary — the browser's built-in `DOMParser` handles OOXML's well-formed XML correctly with zero added bundle. |
+| **JSZip + DOMParser** | **Accepted** | JSZip (~45 KB gzipped) extracts XML from the .docx ZIP. Browser-native `DOMParser` parses the XML. Custom walker converts OOXML → CriticMarkup markdown. Total new dependency: 1 package, ~45 KB. |
+
+### Key insight: output is CriticMarkup, not a new format
+
+The DOCX importer's output is a **CriticMarkup markdown string** — the same format as the paste import. This means the entire existing pipeline (`criticMarkupToHTML()` → TipTap `setContent()` → editor with tracked changes) works unchanged. No new editor logic, no new serialization, no new panel code. The docx importer is purely an input converter.
+
+### Substitution detection is heuristic
+
+OOXML has no explicit substitution element. A substitution appears as adjacent `<w:del>` + `<w:ins>` (same author, similar timestamp). The walker uses heuristics: same author + adjacent position → `{~~old~>new~~}`. Fallback (separate `{--...--}{++...++}`) is semantically correct CriticMarkup, just less compact.
+
+### Comment-to-change attribution
+
+OOXML comments anchor to text ranges via `<w:commentRangeStart>` / `<w:commentRangeEnd>`. When a comment range overlaps a tracked change, the comment is attributed to that change (`{++text++}{>>comment<<}`). When it anchors to plain text, it becomes a highlight (`{==text==}{>>comment<<}`). This maps directly to how Markdown Feedback already handles the two comment types.
+
+### Phased build
+
+Five phases (A through E) with increasing complexity. Phase A ignores tracked changes entirely and just produces clean markdown. Each subsequent phase adds one layer: tracked changes, then comments, then attribution, then polish. Full spec: `docs/docx-import.md`.

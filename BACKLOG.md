@@ -69,13 +69,30 @@
 
 ---
 
+### Phase 6: Session Persistence + Undo
+- [x] localStorage auto-save (debounced 1s)
+- [x] Session recovery prompt on app load ("Resume your previous session?" with relative timestamp)
+- [x] Undo/redo at tracked-change level — ProseMirror's History extension handles this natively because the intercept layer applies/removes marks rather than deleting text
+- [x] Mixed-span operations (select across original + inserted + deleted text) — already working via `collectTextRanges` in Phase 1
+
+**Phase 6 design decisions:**
+- Save format: serialized CriticMarkup string + comments map + timestamp (same as export format, human-readable in DevTools)
+- Restore path reuses the existing import flow (`criticMarkupToHTML` → `setContent` + `setComments`)
+- Auto-save debounced at 1s via `useDebouncedValue` hook
+- Recovery modal: "Start Fresh" clears localStorage and keeps sample content; "Resume" restores via import path
+
+---
+
 ## Up Next
 
-### Phase 6: Session Persistence + Undo
-- [ ] localStorage auto-save (debounced 1s)
-- [ ] Session recovery prompt on app load
-- [ ] Undo/redo at tracked-change level (undo deletion = restore to original, not re-insert)
-- [ ] Mixed-span operations (select across original + inserted + deleted text)
+### Phase 7: DOCX Import (Google Docs → CriticMarkup)
+Import a `.docx` file exported from Google Docs (with Suggesting mode edits) and reconstruct all tracked changes and comments as CriticMarkup. All processing client-side — JSZip + browser-native DOMParser. Full spec: `docs/docx-import.md`.
+
+- [ ] **Phase A:** Basic .docx → markdown (no tracked changes) — JSZip + DOMParser, file picker UI
+- [ ] **Phase B:** Tracked changes → CriticMarkup (`{++…++}`, `{--…--}`, `{~~…~~}`)
+- [ ] **Phase C:** Comments extraction from `word/comments.xml` → `{>>…<<}`
+- [ ] **Phase D:** Comment-to-change attribution (comment on suggestion vs. comment on plain text)
+- [ ] **Phase E:** Polish — lists, moves, hyperlinks, edge cases, lazy loading
 
 ### Responsive Design + About Panel
 
@@ -180,12 +197,6 @@ Refinements that improve the feel but aren't blockers.
 - [ ] Pre-defined tags: `[tone]`, `[clarity]`, `[structure]`, `[grammar]`, `[concision]`, `[accuracy]`
 - [ ] Keyboard shortcuts or buttons for quick tagging
 - [ ] Serialize as prefixed comments: `{>>[tone] comment text<<}`
-
-### Google Docs → CriticMarkup Extraction
-- [ ] Take a Google Doc with track changes/comments and extract in CriticMarkup format
-- [ ] TBD: shared componentry with the web app (e.g. import flow) or separate tool solving the same user need
-- [ ] Research: Google Docs API for reading suggestions/comments vs. export-as-docx + pandoc + Lua filter pipeline
-- [ ] Comments mapping: Google Docs comments → `{>>…<<}` (known to be lossy in the pandoc pipeline today)
 
 ### LLM Integration
 - [ ] LLM pre-edit: Claude proposes edits as CriticMarkup, human reviews in-editor (bidirectional workflow)

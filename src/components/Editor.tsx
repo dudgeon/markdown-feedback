@@ -18,6 +18,11 @@ import { serializeCriticMarkup } from '../utils/serializeCriticMarkup'
 import { extractChanges, type ChangeEntry } from '../utils/extractChanges'
 import { criticMarkupToHTML } from '../utils/parseCriticMarkup'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
+import {
+  useSessionPersistence,
+  type SavedSession,
+} from '../hooks/useSessionPersistence'
+import RecoveryModal from './RecoveryModal'
 
 const SAMPLE_MARKDOWN = `# Selected Passages from *The Elements of Style*
 
@@ -42,6 +47,13 @@ export default function Editor() {
   const [focusCommentId, setFocusCommentId] = useState<string | null>(null)
   const [panelOpen, setPanelOpen] = useState(true)
   const [aboutOpen, setAboutOpen] = useState(false)
+  const [showRecovery, setShowRecovery] = useState(false)
+  const [recoverySession, setRecoverySession] = useState<SavedSession | null>(
+    null
+  )
+
+  const { getSavedSession, saveSession, clearSession } =
+    useSessionPersistence()
 
   // Ref to avoid stale closures in handleEditorChange
   const commentsRef = useRef(comments)
@@ -204,6 +216,41 @@ export default function Editor() {
     }
   }, [handleTabToComment, handleCreateHighlight])
 
+  // Check for saved session on mount
+  useEffect(() => {
+    const saved = getSavedSession()
+    if (saved) {
+      setRecoverySession(saved)
+      setShowRecovery(true)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-save to localStorage (debounced 1s)
+  const debouncedMarkupForSave = useDebouncedValue(rawMarkup, 1000)
+
+  useEffect(() => {
+    if (debouncedMarkupForSave) {
+      saveSession(debouncedMarkupForSave, commentsRef.current)
+    }
+  }, [debouncedMarkupForSave]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleResume = useCallback(() => {
+    if (recoverySession && editor) {
+      const { html, comments: savedComments } = criticMarkupToHTML(
+        recoverySession.markup
+      )
+      commentsRef.current = savedComments
+      setComments(savedComments)
+      editor.commands.setContent(html)
+    }
+    setShowRecovery(false)
+  }, [recoverySession, editor])
+
+  const handleStartFresh = useCallback(() => {
+    clearSession()
+    setShowRecovery(false)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Close mobile drawer on Escape
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -293,6 +340,14 @@ export default function Editor() {
         isOpen={aboutOpen}
         onClose={() => setAboutOpen(false)}
       />
+
+      {showRecovery && recoverySession && (
+        <RecoveryModal
+          savedAt={recoverySession.savedAt}
+          onResume={handleResume}
+          onStartFresh={handleStartFresh}
+        />
+      )}
     </div>
   )
 }
