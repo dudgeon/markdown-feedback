@@ -102,25 +102,14 @@ Import a `.docx` file exported from Google Docs (with Suggesting mode edits) and
 - Lists: `word/numbering.xml` parsed to map `(numId, ilvl)` → `bullet`/`decimal`, emitted as `- ` or `1. ` prefixes.
 - Entries joined with `\n\n` (not `\n`) because `criticMarkupToHTML` splits blocks on double-newline.
 
-### Spike: Custom Domain (`markdown-feedback.com`)
-Domain purchased via Cloudflare. Connect it to the GitHub Pages deployment. Prefer CLI (`wrangler`, `gh`) over browser dashboard.
+### Spike: Custom Domain (`markdown-feedback.com`) (COMPLETE)
+Domain purchased via Cloudflare. Connected to GitHub Pages deployment.
 
-- [ ] **Cloudflare DNS:** Add CNAME records pointing to `dudgeon.github.io`
-  - `@` (apex) → `dudgeon.github.io` (Cloudflare flattens CNAME at apex automatically)
-  - `www` → `dudgeon.github.io`
-  - Proxy status: ON (orange cloud) for CDN + CNAME flattening
-  - SSL mode: Full (GitHub Pages provides its own Let's Encrypt cert)
-  - CLI: `npx wrangler dns records create <zone-id> --type CNAME --name @ --content dudgeon.github.io --proxied`
-- [ ] **GitHub Pages custom domain:** Configure via `gh api` or add `CNAME` file
-  - Add `public/CNAME` with content `markdown-feedback.com` (included in every build)
-  - Or: `gh api repos/dudgeon/markdown-feedback/pages -X PUT -f cname=markdown-feedback.com`
-  - Enforce HTTPS: `gh api repos/dudgeon/markdown-feedback/pages -X PUT -F https_enforced=true`
-- [ ] **Vite base path:** Change `base` in `vite.config.ts` from `'/markdown-feedback/'` to `'/'`
-  - Custom domain serves from root, not `/markdown-feedback/` subdirectory
-  - This will break the old `dudgeon.github.io/markdown-feedback/` URL (GitHub auto-redirects once custom domain is set)
-  - Dev server URL changes from `localhost:5173/markdown-feedback/` to `localhost:5173/`
-- [ ] **Update references:** Update live URL in `README.md`, `CLAUDE.md`, `BACKLOG.md`, `AboutPanel.tsx`
-- [ ] **Verify:** Confirm `https://markdown-feedback.com` loads correctly, SSL valid, `www` redirects to apex
+- [x] **Cloudflare DNS:** CNAME records `@` and `www` → `dudgeon.github.io` (Proxied, SSL Full)
+- [x] **GitHub Pages custom domain:** `public/CNAME` + `gh api` configuration
+- [x] **Vite base path:** Changed from `'/markdown-feedback/'` to `'/'`
+- [x] **Update references:** Live URL updated in `README.md`, `CLAUDE.md`, `AboutPanel.tsx`
+- [x] **Verify:** `https://markdown-feedback.com` loads correctly, SSL valid via Cloudflare
 
 ### Responsive Design + About Panel
 
@@ -169,6 +158,9 @@ Refinements that improve the feel but aren't blockers.
 ### Per-character deletion cursor dead zones (fixed)
 - [x] ~~Backspacing through original text created one `contenteditable=false` span per character, forming a cursor dead zone~~ — fixed: `handleSingleCharDelete` now reuses the ID of an adjacent standalone deletion mark. ProseMirror merges marks with equal attributes into a single DOM span, eliminating the wall of adjacent non-editable elements. See `docs/deletion-span-solutions.md` for the full analysis.
 
+### Changes panel overflow
+- [ ] Right-side changes/comment panel viewport area is not locked to the bottom of the screen — panel extends beyond viewport instead of scrolling internally
+
 ### Serialization edge cases
 - [ ] Substitution over text that already contains old deletions — old deletions emit as standalone `{--…--}` outside the `{~~…~~}`, which is semantically correct but may look odd
 - [ ] Serializer only handles paragraphs and headings — lists, blockquotes, code blocks pass through without markdown prefixes
@@ -181,6 +173,11 @@ Refinements that improve the feel but aren't blockers.
 ---
 
 ## Backlog (Unscheduled)
+
+### URL Parameter Import
+- [ ] Accept a URL query parameter (e.g. `?md=...`) that pre-loads markdown content into the editor
+- [ ] Content should be URL-decoded and fed through the existing CriticMarkup import path
+- [ ] Enables external tools/workflows to link directly into the editor with pre-populated content
 
 ### Prominent Import Button (Default State)
 - [ ] When the app loads with placeholder text (no locally saved session), style the Import button with primary coloring or heavy stroke to draw attention

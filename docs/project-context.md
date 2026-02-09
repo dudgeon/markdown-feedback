@@ -311,3 +311,29 @@ Three bugs were found during browser testing with a real Google Docs export:
 Lists were also added: `word/numbering.xml` is parsed to build a `(numId, ilvl) → 'bullet' | 'decimal'` map. List paragraphs emit `- ` or `1. ` prefixes. Entries are joined with `\n\n` to match `criticMarkupToHTML`'s block separator.
 
 Phase E remaining work: hyperlinks, tables, moves, and edge case polishing.
+
+## 12. Custom Domain (`markdown-feedback.com`)
+
+Domain purchased via Cloudflare. Configured to point to the GitHub Pages deployment.
+
+### DNS setup
+
+Two CNAME records in Cloudflare DNS, both proxied (orange cloud):
+- `@` (apex) → `dudgeon.github.io` — Cloudflare flattens the CNAME at apex automatically
+- `www` → `dudgeon.github.io`
+
+SSL/TLS mode set to Full (GitHub Pages provides its own Let's Encrypt cert; Cloudflare terminates the visitor-facing TLS).
+
+### GitHub Pages configuration
+
+Custom domain set via `gh api repos/dudgeon/markdown-feedback/pages -X PUT -f cname=markdown-feedback.com`. A `public/CNAME` file containing `markdown-feedback.com` is included in every build so the custom domain persists across deployments.
+
+### Vite base path
+
+Changed from `'/markdown-feedback/'` to `'/'`. The old `dudgeon.github.io/markdown-feedback/` URL now redirects to `markdown-feedback.com`. Dev server URL changed from `localhost:5173/markdown-feedback/` to `localhost:5173/`.
+
+### Implementation notes
+
+- Wrangler CLI lacks DNS management commands; Cloudflare API tokens from other projects were scoped to different zones. DNS records were created via the Cloudflare dashboard.
+- GitHub Pages HTTPS enforcement requires the Let's Encrypt cert to be provisioned first (depends on DNS propagation). Cloudflare handles HTTPS for visitors immediately via its edge cert, so this is non-blocking.
+- Cloudflare caches the HTML page; after deploying a new build with updated asset paths, a hard refresh (Cmd+Shift+R) was needed to bypass the cached version.
