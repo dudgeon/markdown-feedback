@@ -73,6 +73,12 @@ export default function AboutPanel({ isOpen, onClose }: AboutPanelProps) {
             </p>
           </div>
 
+          <p className="mt-4 text-xs text-gray-500 leading-relaxed">
+            All processing happens in your browser — no server, no accounts, no
+            data sent anywhere. Sessions persist in local storage, so avoid
+            pasting sensitive content on shared computers.
+          </p>
+
           <div className="mt-6">
             <a
               href="https://github.com/dudgeon/markdown-feedback"
