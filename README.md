@@ -8,7 +8,7 @@ Built for the workflow: LLM generates draft → human edits with track changes �
 
 ## Status
 
-**Phase 4 complete** (changes panel). Phase 5 (annotation system) is next. See [BACKLOG.md](BACKLOG.md) for the full roadmap.
+**Phase 6 complete** (session persistence + undo). See [BACKLOG.md](BACKLOG.md) for the full roadmap.
 
 ## How It Works
 
@@ -21,6 +21,8 @@ The editor intercepts every edit at the keyboard/input level and transforms it i
 | Select original + type replacement | Substitution: strikethrough old + green new, linked |
 | Edit within your own insertion | Normal editing (no tracking) |
 | Backspace on already-deleted text | Cursor skips over it |
+| Tab on a tracked change | Jump to comment input |
+| Cmd+Shift+H with selection | Highlight text for standalone comment |
 
 The output is standard CriticMarkup:
 
@@ -60,4 +62,5 @@ npm run preview   # Preview production build
 - [BACKLOG.md](BACKLOG.md) — Roadmap and feature backlog
 - [docs/prd.md](docs/prd.md) — Full product requirements (intercept architecture)
 - [docs/project-context.md](docs/project-context.md) — Decision log and project context
+- [docs/docx-import.md](docs/docx-import.md) — DOCX import architecture (Phase 7)
 - [CLAUDE.md](CLAUDE.md) — AI coding assistant instructions
