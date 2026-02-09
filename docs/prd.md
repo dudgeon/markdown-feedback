@@ -1,4 +1,4 @@
-# CriticMark Editor — Product Requirements Document
+# Markdown Feedback — Product Requirements Document
 
 **Status:** In progress (Phase 1 complete, see `BACKLOG.md` for roadmap)
 **Architecture:** Intercept-based (see below and `docs/project-context.md` for rationale)

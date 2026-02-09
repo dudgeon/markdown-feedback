@@ -10,7 +10,7 @@ Full specification lives in `docs/prd.md` and `docs/project-context.md`. Roadmap
 
 **Live:** https://dudgeon.github.io/markdown-feedback/
 
-**Status:** Phase 5 COMPLETE (annotation system). Next: Phase 6 (session persistence + undo).
+**Status:** Phase 6 COMPLETE (session persistence + undo). Next: Phase 7 (DOCX import).
 
 ## Commands
 
@@ -46,12 +46,16 @@ This project uses an intercept-based architecture, NOT a diff-based approach. Ev
 - `src/utils/parseCriticMarkup.ts` — Reverse of serializer. `parseCriticMarkup()` tokenizes a CriticMarkup string into typed segments including highlights and comments; `criticMarkupToHTML()` returns `{ html, comments }` — the HTML with tracked-change spans, and a Record mapping change IDs to comment text. `extractCommentsFromSegments()` links comment tokens to their preceding change/highlight.
 - `src/utils/exportDocument.ts` — Export functions: `exportCriticMarkup()` (YAML frontmatter + markup), `exportClean()` (accept all changes), `exportOriginal()` (reject all changes), `countChanges()`, `downloadFile()`. Both clean and original exports strip `{==...==}` highlight markers.
 - `src/utils/extractChanges.ts` — Walks ProseMirror doc tree and extracts a structured `ChangeEntry[]` list with type (deletion/insertion/substitution/highlight), text, context snippets, positions, and optional comment text. Accepts a `comments` Record to merge into entries.
-- `src/components/Editor.tsx` — TipTap editor setup with two-column layout, toolbar, serialization wiring, source view, and comment state management. Comments live in React state as `Record<string, string>` (keyed by change/highlight ID). Orphaned comments are pruned on every editor update. Custom events bridge the TrackChanges plugin keyboard shortcuts to React state.
+- `src/components/Editor.tsx` — TipTap editor setup with two-column layout, toolbar, serialization wiring, source view, comment state management, and session persistence. Comments live in React state as `Record<string, string>` (keyed by change/highlight ID). Orphaned comments are pruned on every editor update. Custom events bridge the TrackChanges plugin keyboard shortcuts to React state. Auto-saves to localStorage (debounced 1s) and shows recovery modal on load if a previous session exists.
 - `src/components/ChangesPanel.tsx` — Right sidebar listing all tracked changes and highlights in document order. Shows change type badge, context snippets with inline highlighting, click-to-scroll, and per-entry comment input (auto-save on blur, Tab/Enter to save and return to editor).
 - `src/components/ImportModal.tsx` — Paste import modal. Content is always parsed for CriticMarkup tokens (no "Start fresh" vs "Resume editing" prompt — the planned rebaseline feature handles clearing markup).
 - `src/components/ExportMenu.tsx` — Dropdown menu with download options (CriticMarkup, clean, original) and copy to clipboard
 - `src/components/SourceView.tsx` — Collapsible panel showing syntax-highlighted CriticMarkup output with copy button
-- `src/hooks/useDebouncedValue.ts` — Generic debounce hook for source view updates
+- `src/components/RecoveryModal.tsx` — Session recovery prompt shown on app load when localStorage has saved state. "Resume" restores via import path; "Start Fresh" clears storage.
+- `src/components/Toolbar.tsx` — Top toolbar with about icon, title, Import (responsive), Export menu, and changes panel toggle with badge
+- `src/components/AboutPanel.tsx` — Left slide-in panel with app description, "Why I built this", GitHub link, and footer
+- `src/hooks/useDebouncedValue.ts` — Generic debounce hook for source view updates and auto-save
+- `src/hooks/useSessionPersistence.ts` — localStorage save/load/clear for session state (CriticMarkup string + comments map + timestamp)
 - `src/index.css` — Track changes visual styles + source view syntax highlighting
 
 ### Import Design Decision
@@ -138,6 +142,8 @@ BACKLOG.md                 # Roadmap + feature backlog
 docs/                      # Specification & design documents
   prd.md                   # Product requirements document
   project-context.md       # Decision log & project context
+  about-panel.md           # About panel content spec
+  docx-import.md           # DOCX import architecture (Phase 7)
 src/                       # Application source code
   components/              # React components
   extensions/              # TipTap/ProseMirror extensions

@@ -145,10 +145,10 @@ Refinements that improve the feel but aren't blockers.
 - [ ] Substitution over text that already contains old deletions — old deletions emit as standalone `{--…--}` outside the `{~~…~~}`, which is semantically correct but may look odd
 - [ ] Serializer only handles paragraphs and headings — lists, blockquotes, code blocks pass through without markdown prefixes
 - [ ] `hardBreak` nodes within a paragraph are not emitted as `\n`
-- [ ] No handling of `{>>comment<<}` yet (comments are Phase 5, but serializer will need updating)
+- [x] ~~No handling of `{>>comment<<}` yet~~ — implemented in Phase 5
 
-### Naming cleanup
-- [ ] `docs/prd.md` and `docs/project-context.md` still reference "CriticMark Editor" — update to "Markdown Feedback" when next editing those files
+### Naming cleanup (fixed)
+- [x] ~~`docs/prd.md` and `docs/project-context.md` still reference "CriticMark Editor"~~ — updated to "Markdown Feedback"
 
 ---
 

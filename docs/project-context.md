@@ -1,4 +1,4 @@
-# CriticMark Editor — Project Context & Decision Log
+# Markdown Feedback — Project Context & Decision Log
 
 **For:** Any developer or PM picking up this project
 **Date:** 2026-02-08
@@ -38,7 +38,7 @@ The editor is not the end product — it's the **capture mechanism** for a large
 
 ```
 LLM generates draft
-    → Human edits in CriticMark Editor (changes captured as CriticMarkup)
+    → Human edits in Markdown Feedback (changes captured as CriticMarkup)
     → Human annotates changes with reasoning (comments)
     → CriticMarkup file exported
     → Claude analyzes patterns across multiple files
