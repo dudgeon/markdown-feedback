@@ -8,6 +8,7 @@ interface ChangesPanelProps {
   focusCommentId: string | null
   onFocusHandled: () => void
   onReturnToEditor: () => void
+  onClose?: () => void
 }
 
 const TYPE_CONFIG = {
@@ -40,12 +41,13 @@ export default function ChangesPanel({
   focusCommentId,
   onFocusHandled,
   onReturnToEditor,
+  onClose,
 }: ChangesPanelProps) {
   const commentCount = changes.filter((c) => c.comment).length
 
   return (
     <div className="flex flex-col h-full">
-      <div className="px-4 py-3 border-b border-gray-200 flex-shrink-0">
+      <div className="px-4 py-3 border-b border-gray-200 flex-shrink-0 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-gray-900">
           {changes.length === 0
             ? 'No changes'
@@ -55,6 +57,17 @@ export default function ChangesPanel({
                   : ''
               }`}
         </h2>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="lg:hidden w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded cursor-pointer"
+            aria-label="Close panel"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+            </svg>
+          </button>
+        )}
       </div>
 
       {changes.length === 0 ? (

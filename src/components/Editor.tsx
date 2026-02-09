@@ -11,8 +11,9 @@ import {
 } from '../extensions/trackChanges'
 import SourceView from './SourceView'
 import ImportModal from './ImportModal'
-import ExportMenu from './ExportMenu'
+import Toolbar from './Toolbar'
 import ChangesPanel from './ChangesPanel'
+import AboutPanel from './AboutPanel'
 import { serializeCriticMarkup } from '../utils/serializeCriticMarkup'
 import { extractChanges, type ChangeEntry } from '../utils/extractChanges'
 import { criticMarkupToHTML } from '../utils/parseCriticMarkup'
@@ -39,6 +40,8 @@ export default function Editor() {
   const [sourceExpanded, setSourceExpanded] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [focusCommentId, setFocusCommentId] = useState<string | null>(null)
+  const [panelOpen, setPanelOpen] = useState(true)
+  const [aboutOpen, setAboutOpen] = useState(false)
 
   // Ref to avoid stale closures in handleEditorChange
   const commentsRef = useRef(comments)
@@ -148,7 +151,6 @@ export default function Editor() {
   // Tab-to-comment: called from TrackChanges plugin via custom event
   // Cmd+Shift+H: create highlight on selection
   // These are wired via DOM events since the plugin can't access React state directly
-  const editorContainerRef = useRef<HTMLDivElement>(null)
 
   // Listen for custom events from the TrackChanges plugin
   const handleTabToComment = useCallback(
@@ -156,6 +158,8 @@ export default function Editor() {
       const detail = (e as CustomEvent).detail
       if (detail?.changeId) {
         setFocusCommentId(detail.changeId)
+        // On mobile, open the panel if it's closed
+        setPanelOpen(true)
       }
     },
     []
@@ -176,6 +180,7 @@ export default function Editor() {
       editor.view.dispatch(tr)
       // Focus the comment input for this new highlight
       setFocusCommentId(id)
+      setPanelOpen(true)
     },
     [editor]
   )
@@ -199,52 +204,76 @@ export default function Editor() {
     }
   }, [handleTabToComment, handleCreateHighlight])
 
+  // Close mobile drawer on Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && panelOpen) {
+        // Only close on mobile (< lg:). On desktop, Escape shouldn't close the inline panel.
+        if (window.innerWidth < 1024) {
+          setPanelOpen(false)
+        }
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [panelOpen])
+
+  const changesPanelElement = (
+    <ChangesPanel
+      changes={changes}
+      onScrollTo={handleScrollTo}
+      onCommentChange={handleCommentChange}
+      focusCommentId={focusCommentId}
+      onFocusHandled={handleFocusHandled}
+      onReturnToEditor={handleReturnToEditor}
+      onClose={() => setPanelOpen(false)}
+    />
+  )
+
   return (
-    <div className="max-w-7xl mx-auto p-6">
-      <div className="mb-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              Markdown Feedback
-            </h1>
-            <p className="text-sm text-gray-500 mt-1">
-              Edit the text below. Deletions appear as{' '}
-              <span className="tracked-deletion">red strikethrough</span>,
-              insertions as{' '}
-              <span className="tracked-insertion">green text</span>.
-            </p>
-          </div>
+    <div className="max-w-7xl mx-auto p-4 lg:p-6">
+      <Toolbar
+        onImportClick={() => setImportOpen(true)}
+        onAboutToggle={() => setAboutOpen((prev) => !prev)}
+        onPanelToggle={() => setPanelOpen((prev) => !prev)}
+        isPanelOpen={panelOpen}
+        changeCount={changes.length}
+        markup={rawMarkup}
+      />
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setImportOpen(true)}
-              className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 cursor-pointer transition-colors"
-            >
-              Import
-            </button>
-            <ExportMenu markup={rawMarkup} />
-          </div>
-        </div>
-      </div>
-
-      <div className="flex gap-4" ref={editorContainerRef}>
+      <div className="lg:flex lg:gap-4">
         <div className="flex-1 min-w-0">
           <div className="border border-gray-300 rounded-lg bg-white shadow-sm">
             <EditorContent editor={editor} />
           </div>
         </div>
 
-        <div className="w-80 flex-shrink-0">
-          <div className="border border-gray-200 rounded-lg bg-white shadow-sm h-[calc(100vh-12rem)] sticky top-6">
-            <ChangesPanel
-              changes={changes}
-              onScrollTo={handleScrollTo}
-              onCommentChange={handleCommentChange}
-              focusCommentId={focusCommentId}
-              onFocusHandled={handleFocusHandled}
-              onReturnToEditor={handleReturnToEditor}
-            />
+        {/* Desktop inline panel */}
+        {panelOpen && (
+          <div className="hidden lg:block w-80 flex-shrink-0">
+            <div className="border-l border-gray-200 h-[calc(100vh-10rem)] sticky top-6 overflow-y-auto">
+              {changesPanelElement}
+            </div>
           </div>
+        )}
+      </div>
+
+      {/* Mobile drawer backdrop */}
+      {panelOpen && (
+        <div
+          className="fixed inset-0 bg-black/30 z-40 lg:hidden"
+          onClick={() => setPanelOpen(false)}
+        />
+      )}
+
+      {/* Mobile drawer panel */}
+      <div
+        className={`fixed inset-y-0 right-0 z-50 w-80 max-w-[85vw] bg-white shadow-xl transition-transform duration-200 ease-out lg:hidden ${
+          panelOpen ? 'translate-x-0' : 'translate-x-full'
+        }`}
+      >
+        <div className="h-full overflow-y-auto">
+          {changesPanelElement}
         </div>
       </div>
 
@@ -258,6 +287,11 @@ export default function Editor() {
         isOpen={importOpen}
         onClose={() => setImportOpen(false)}
         onImport={handleImport}
+      />
+
+      <AboutPanel
+        isOpen={aboutOpen}
+        onClose={() => setAboutOpen(false)}
       />
     </div>
   )

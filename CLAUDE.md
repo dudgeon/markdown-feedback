@@ -175,6 +175,10 @@ If a scaffold is needed:
 
 `docs/prd.md` and `docs/project-context.md` are primary project artifacts. Never delete, overwrite, or move them without explicit user approval.
 
+### Keep About Panel Current
+
+When adding or changing user-facing keyboard shortcuts, features, or workflows, update the "Keyboard Shortcuts" section in the About panel (`src/components/AboutPanel.tsx` or equivalent) to reflect the change. The About panel is the user's reference for how to use the app.
+
 ## Relevant Skills for This Build
 
 - **ProseMirror internals** — marks, schema, transactions, plugins, step mapping
