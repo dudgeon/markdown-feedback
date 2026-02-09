@@ -297,3 +297,17 @@ OOXML comments anchor to text ranges via `<w:commentRangeStart>` / `<w:commentRa
 ### Phased build
 
 Five phases (A through E) with increasing complexity. Phase A ignores tracked changes entirely and just produces clean markdown. Each subsequent phase adds one layer: tracked changes, then comments, then attribution, then polish. Full spec: `docs/docx-import.md`.
+
+### Implementation findings (Phases A–D)
+
+Three bugs were found during browser testing with a real Google Docs export:
+
+1. **Google Docs ins→del ordering.** Google Docs puts `<w:ins>` before `<w:del>` for substitutions, opposite of Word's order. The walker was only checking del→ins. Fix: added ins→del detection mirroring the existing logic.
+
+2. **Nested comment markers.** Google Docs nests `commentRangeStart`, `commentRangeEnd`, and `commentReference` runs inside `<w:ins>` and `<w:del>` elements, not as siblings of `<w:p>`. The prepass and walker were only scanning direct children of `<w:p>`. Fix: added recursive scanning inside tracked change elements for comment anchors and references.
+
+3. **Comment-on-substitution key mismatch.** `extractCommentsFromSegments()` (in `parseCriticMarkup.ts`) keyed comments by the insertion's ID, but `extractChanges()` identifies substitution entries by the deletion's ID. Comments on substitutions appeared as "unlinked" in the Changes Panel. Fix: when the preceding segment is an insertion with `pairedWith`, use the `pairedWith` value (deletion's ID) as the comment key.
+
+Lists were also added: `word/numbering.xml` is parsed to build a `(numId, ilvl) → 'bullet' | 'decimal'` map. List paragraphs emit `- ` or `1. ` prefixes. Entries are joined with `\n\n` to match `criticMarkupToHTML`'s block separator.
+
+Phase E remaining work: hyperlinks, tables, moves, and edge case polishing.

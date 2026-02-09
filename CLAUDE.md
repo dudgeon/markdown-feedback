@@ -8,9 +8,9 @@ Markdown Feedback — a web-based track-changes editor for markdown that interce
 
 Full specification lives in `docs/prd.md` and `docs/project-context.md`. Roadmap and feature backlog: `BACKLOG.md`.
 
-**Live:** https://dudgeon.github.io/markdown-feedback/
+**Live:** https://markdown-feedback.com
 
-**Status:** Phase 6 COMPLETE (session persistence + undo). Next: Phase 7 (DOCX import).
+**Status:** Phase 7 IN PROGRESS (DOCX import — Phases A–D complete, E partial). See BACKLOG.md for details.
 
 ## Commands
 
@@ -28,6 +28,7 @@ npm run preview  # Preview production build locally
 - **Tailwind CSS 4** (via `@tailwindcss/vite` plugin)
 - **Vite 7** — build tool
 - **nanoid** — unique IDs for tracked change spans
+- **JSZip** — client-side .docx extraction (dynamic import, only loaded on .docx import)
 
 ## Architecture
 
@@ -48,7 +49,9 @@ This project uses an intercept-based architecture, NOT a diff-based approach. Ev
 - `src/utils/extractChanges.ts` — Walks ProseMirror doc tree and extracts a structured `ChangeEntry[]` list with type (deletion/insertion/substitution/highlight), text, context snippets, positions, and optional comment text. Accepts a `comments` Record to merge into entries.
 - `src/components/Editor.tsx` — TipTap editor setup with two-column layout, toolbar, serialization wiring, source view, comment state management, and session persistence. Comments live in React state as `Record<string, string>` (keyed by change/highlight ID). Orphaned comments are pruned on every editor update. Custom events bridge the TrackChanges plugin keyboard shortcuts to React state. Auto-saves to localStorage (debounced 1s) and shows recovery modal on load if a previous session exists.
 - `src/components/ChangesPanel.tsx` — Right sidebar listing all tracked changes and highlights in document order. Shows change type badge, context snippets with inline highlighting, click-to-scroll, and per-entry comment input (auto-save on blur, Tab/Enter to save and return to editor).
-- `src/components/ImportModal.tsx` — Paste import modal. Content is always parsed for CriticMarkup tokens (no "Start fresh" vs "Resume editing" prompt — the planned rebaseline feature handles clearing markup).
+- `src/utils/parseDocx.ts` — Entry point for .docx import. Takes an ArrayBuffer, extracts XML files via JSZip (dynamic import), parses with DOMParser, and calls `docxToMarkdown()`. Extracts `word/document.xml`, `word/comments.xml`, and `word/numbering.xml`.
+- `src/utils/docxToMarkdown.ts` — OOXML walker that converts parsed XML DOMs to a CriticMarkup markdown string. Handles tracked changes (`<w:ins>`, `<w:del>` in both orderings), comments, comment-to-change attribution, and list detection via numbering.xml.
+- `src/components/ImportModal.tsx` — Tabbed import modal (Paste / .docx File). Paste tab parses CriticMarkup tokens. DOCX tab has file picker, parse status with change/comment counts, and error handling.
 - `src/components/ExportMenu.tsx` — Dropdown menu with download options (CriticMarkup, clean, original) and copy to clipboard
 - `src/components/SourceView.tsx` — Collapsible panel showing syntax-highlighted CriticMarkup output with copy button
 - `src/components/RecoveryModal.tsx` — Session recovery prompt shown on app load when localStorage has saved state. "Resume" restores via import path; "Start Fresh" clears storage.
@@ -97,18 +100,14 @@ export NVM_DIR="$HOME/.nvm" && [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" 
 
 Pushing to `main` auto-deploys to GitHub Pages via `.github/workflows/deploy.yml`.
 
-The `base` path in `vite.config.ts` **must** match the repo name (`/markdown-feedback/`). This affects:
-- Production asset paths (CSS, JS bundles)
-- Dev server URL: `http://localhost:5173/markdown-feedback/` (not just `/`)
-
-If the repo is ever renamed, update `base` in `vite.config.ts` to match.
+The `base` path in `vite.config.ts` is `'/'` because the app is served from `markdown-feedback.com` (custom domain on GitHub Pages). The `public/CNAME` file ensures the custom domain is preserved across deployments. Dev server URL: `http://localhost:5173/`.
 
 ## Testing
 
 Always verify changes in the browser, not just with `tsc` or `npm run build`. **Important:** The user must type `@browser` in the chat to connect the Chrome browser tools. Remind them if browser testing is needed and the tools aren't responding.
 
 Use the Chrome browser automation tools (`mcp__claude-in-chrome__*`) to:
-1. Navigate to http://localhost:5173/markdown-feedback/
+1. Navigate to http://localhost:5173/
 2. Make edits (click, type, select+delete, select+type)
 3. Screenshot to verify visual styling
 4. `javascript_tool` to inspect DOM structure

@@ -124,9 +124,13 @@ export function extractCommentsFromSegments(
           prev.type === 'insertion' ||
           prev.type === 'highlight')
       ) {
-        // For substitutions, link to the insertion (it's the last segment of the pair)
-        // For standalone changes/highlights, link to the segment's own ID
-        comments[prev.id] = segments[i].text
+        // For substitutions, the insertion is the last segment before the comment.
+        // Use the deletion's ID (via pairedWith) since extractChanges uses the
+        // deletion's ID as the substitution entry's ID.
+        const key = (prev.type === 'insertion' && prev.pairedWith)
+          ? prev.pairedWith
+          : prev.id
+        comments[key] = segments[i].text
         break
       }
     }

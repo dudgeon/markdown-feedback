@@ -88,11 +88,39 @@
 ### Phase 7: DOCX Import (Google Docs → CriticMarkup)
 Import a `.docx` file exported from Google Docs (with Suggesting mode edits) and reconstruct all tracked changes and comments as CriticMarkup. All processing client-side — JSZip + browser-native DOMParser. Full spec: `docs/docx-import.md`.
 
-- [ ] **Phase A:** Basic .docx → markdown (no tracked changes) — JSZip + DOMParser, file picker UI
-- [ ] **Phase B:** Tracked changes → CriticMarkup (`{++…++}`, `{--…--}`, `{~~…~~}`)
-- [ ] **Phase C:** Comments extraction from `word/comments.xml` → `{>>…<<}`
-- [ ] **Phase D:** Comment-to-change attribution (comment on suggestion vs. comment on plain text)
-- [ ] **Phase E:** Polish — lists, moves, hyperlinks, edge cases, lazy loading
+- [x] **Phase A:** Basic .docx → markdown (no tracked changes) — JSZip + DOMParser, file picker UI
+- [x] **Phase B:** Tracked changes → CriticMarkup (`{++…++}`, `{--…--}`, `{~~…~~}`)
+- [x] **Phase C:** Comments extraction from `word/comments.xml` → `{>>…<<}`
+- [x] **Phase D:** Comment-to-change attribution (comment on suggestion vs. comment on plain text)
+- [ ] **Phase E:** Polish — ~~lists,~~ moves, hyperlinks, edge cases, lazy loading
+
+**Phase 7 design decisions:**
+- Output is a CriticMarkup markdown string — same format as paste import. Entire existing pipeline (`criticMarkupToHTML` → `setContent`) works unchanged.
+- Google Docs puts `<w:ins>` before `<w:del>` for substitutions (reversed from Word). Walker detects both orderings.
+- Comment markers (`commentRangeStart/End`, `commentReference`) can nest inside `<w:ins>`/`<w:del>` elements — walker scans inside tracked changes to find them.
+- Comment on a substitution: `extractCommentsFromSegments` keys the comment by the deletion's ID (matching how `extractChanges` identifies substitution entries).
+- Lists: `word/numbering.xml` parsed to map `(numId, ilvl)` → `bullet`/`decimal`, emitted as `- ` or `1. ` prefixes.
+- Entries joined with `\n\n` (not `\n`) because `criticMarkupToHTML` splits blocks on double-newline.
+
+### Spike: Custom Domain (`markdown-feedback.com`)
+Domain purchased via Cloudflare. Connect it to the GitHub Pages deployment. Prefer CLI (`wrangler`, `gh`) over browser dashboard.
+
+- [ ] **Cloudflare DNS:** Add CNAME records pointing to `dudgeon.github.io`
+  - `@` (apex) → `dudgeon.github.io` (Cloudflare flattens CNAME at apex automatically)
+  - `www` → `dudgeon.github.io`
+  - Proxy status: ON (orange cloud) for CDN + CNAME flattening
+  - SSL mode: Full (GitHub Pages provides its own Let's Encrypt cert)
+  - CLI: `npx wrangler dns records create <zone-id> --type CNAME --name @ --content dudgeon.github.io --proxied`
+- [ ] **GitHub Pages custom domain:** Configure via `gh api` or add `CNAME` file
+  - Add `public/CNAME` with content `markdown-feedback.com` (included in every build)
+  - Or: `gh api repos/dudgeon/markdown-feedback/pages -X PUT -f cname=markdown-feedback.com`
+  - Enforce HTTPS: `gh api repos/dudgeon/markdown-feedback/pages -X PUT -F https_enforced=true`
+- [ ] **Vite base path:** Change `base` in `vite.config.ts` from `'/markdown-feedback/'` to `'/'`
+  - Custom domain serves from root, not `/markdown-feedback/` subdirectory
+  - This will break the old `dudgeon.github.io/markdown-feedback/` URL (GitHub auto-redirects once custom domain is set)
+  - Dev server URL changes from `localhost:5173/markdown-feedback/` to `localhost:5173/`
+- [ ] **Update references:** Update live URL in `README.md`, `CLAUDE.md`, `BACKLOG.md`, `AboutPanel.tsx`
+- [ ] **Verify:** Confirm `https://markdown-feedback.com` loads correctly, SSL valid, `www` redirects to apex
 
 ### Responsive Design + About Panel
 
@@ -158,6 +186,17 @@ Refinements that improve the feel but aren't blockers.
 - [ ] When the app loads with placeholder text (no locally saved session), style the Import button with primary coloring or heavy stroke to draw attention
 - [ ] Should use an existing Tailwind/library style for visual consistency — prominent but not jarring
 - [ ] Revert to normal button styling once user has imported content or started editing
+
+### Style Change Tracking
+- [ ] Track formatting/style changes (bold, italic, heading level, etc.) in the native editor — currently only insertions and deletions are intercepted
+- [ ] Represent style changes in CriticMarkup output (may need convention beyond the spec, e.g. comment annotations describing the style change)
+- [ ] Import style changes from `.docx` files (Google Docs track-changes includes formatting changes alongside text edits)
+
+### Dual-Document Diff Import
+- [ ] Add ability to import two copies of a document (original and changed) and infer the diffs
+- [ ] Reconstruct insertions, deletions, and substitutions as tracked changes in the editor
+- [ ] Allow further editing/markup on top of the inferred diffs
+- [ ] UI: could be a second textarea in the Import modal, or a two-file picker
 
 ### Editor Polish
 - [ ] Paragraph-level deletions (CriticMarkup can't span paragraph boundaries)

@@ -49,7 +49,8 @@ export default function AboutPanel({ isOpen, onClose }: AboutPanelProps) {
             >
               CriticMarkup
             </a>-native
-            formatting.
+            formatting. Import from paste or directly from Google Docs
+            via .docx files with tracked changes and comments preserved.
           </p>
 
           <p className="mt-6 text-[10px] font-semibold tracking-widest uppercase text-gray-400">

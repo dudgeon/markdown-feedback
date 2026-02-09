@@ -4,11 +4,11 @@ A web-based track-changes editor for markdown. Edit naturally — every deletion
 
 Built for the workflow: LLM generates draft → human edits with track changes → changes + annotations exported as portable `.md` → patterns analyzed to improve future drafts.
 
-**Live:** https://dudgeon.github.io/markdown-feedback/
+**Live:** https://markdown-feedback.com
 
 ## Status
 
-**Phase 6 complete** (session persistence + undo). See [BACKLOG.md](BACKLOG.md) for the full roadmap.
+**Phase 7 in progress** (DOCX import from Google Docs — Phases A–D complete). See [BACKLOG.md](BACKLOG.md) for the full roadmap.
 
 ## How It Works
 
@@ -56,6 +56,7 @@ npm run preview   # Preview production build
 - Tailwind CSS 4
 - Vite 7
 - nanoid — unique IDs for tracked change spans
+- JSZip — client-side .docx extraction
 
 ## Project Documents
 
