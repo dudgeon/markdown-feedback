@@ -38,8 +38,9 @@ export default function AboutPanel({ isOpen, onClose }: AboutPanelProps) {
       >
         <div className="h-full overflow-y-auto p-6 flex flex-col">
           <p className="text-sm text-gray-700 leading-relaxed">
-            Markdown Feedback helps you make, track, and add context to changes
-            in markdown using AI-friendly,{' '}
+            <strong>Markdown Feedback</strong> helps you make, track, and add
+            context to changes you make while editing markdown files — all while
+            using AI-friendly,{' '}
             <a
               href="https://fletcher.github.io/MultiMarkdown-6/syntax/critic.html"
               target="_blank"
@@ -47,8 +48,8 @@ export default function AboutPanel({ isOpen, onClose }: AboutPanelProps) {
               className="text-blue-600 hover:text-blue-800 underline"
             >
               CriticMarkup
-            </a>{' '}
-            native formatting.
+            </a>-native
+            formatting.
           </p>
 
           <p className="mt-6 text-[10px] font-semibold tracking-widest uppercase text-gray-400">
