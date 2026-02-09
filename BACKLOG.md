@@ -46,30 +46,30 @@
 - Uncommented count and filter toggle deferred to Phase 5 (requires comments)
 - Scroll-to uses native text selection highlight (no pulse/glow decoration yet)
 
+### Phase 5: Annotation System
+- [x] Inline comment input in Changes Panel per change (text field below each change card, auto-save on blur)
+- [x] Standalone comment: select text in editor + Cmd+Shift+H to create a highlight + comment
+- [x] Standalone comments appear in Changes Panel alongside edits, in document order
+- [x] Keyboard shortcut (Tab) to jump focus from editor to comment input — **only when cursor is on/adjacent to a tracked change or highlight**; otherwise Tab functions normally
+- [x] From comment input: Enter to save, Tab to return focus to editor
+- [x] Edit comments serialize as `{>>…<<}` immediately after their change
+- [x] Standalone comments serialize as `{==highlighted text==}{>>comment<<}`
+- [x] Both comment types re-import on paste import
+- [x] Orphaned comment handling (pruned on editor update when change ID no longer exists)
+- [x] Comment count in panel header ("N changes, M comments")
+- [x] TrackedHighlight mark (yellow highlight, non-inclusive)
+- [x] Comments stored in React state as `Record<string, string>` (external to ProseMirror)
+- [x] Source view syntax highlighting for highlights and comments
+
+**Phase 5 design decisions:**
+- No separate Edit/Annotate mode — editor stays editable at all times
+- Comments live in React state, not ProseMirror mark attributes (substitutions have two marks; external state is simpler)
+- Tab only activates when cursor is on/adjacent to a tracked change; otherwise Tab functions normally
+- Custom DOM events (`trackchanges:tab-to-comment`, `trackchanges:create-highlight`) bridge plugin keyboard shortcuts to React state
+
 ---
 
 ## Up Next
-
-### Phase 5: Annotation System
-
-**Two types of comments:**
-1. **Edit comments** — attached to a tracked change (deletion, insertion, or substitution). Serialized as `{>>…<<}` immediately after the change markup.
-2. **Standalone comments** — on unchanged text, independent of any edit. User selects a passage and adds a comment without modifying it. Serialized as `{==highlighted text==}{>>comment<<}` (CriticMarkup highlight syntax).
-
-Not all edits will have comments, and not all comments will be attached to edits.
-
-**Tasks:**
-- [ ] Inline comment input in Changes Panel per change (text field below each change card)
-- [ ] Standalone comment: select text in editor + keyboard shortcut to create a highlight + comment (no edit required)
-- [ ] Standalone comments appear in Changes Panel alongside edits, in document order
-- [ ] Keyboard shortcut (Tab) to jump focus from editor to comment input for the nearest/last change or highlight
-- [ ] From comment input: Enter to save, Tab to return focus to editor at the same cursor position
-- [ ] Edit comments serialize as `{>>…<<}` immediately after their change
-- [ ] Standalone comments serialize as `{==highlighted text==}{>>comment<<}`
-- [ ] Both comment types re-import on paste import
-- [ ] Orphaned comment handling (undo removes parent change → comment becomes standalone or is removed)
-
-**Design decision:** No separate Edit/Annotate mode. The editor stays editable at all times. Users flow between editing and annotating via keyboard shortcuts — make an edit, Tab to annotate it, Tab back to keep editing. This matches the natural review workflow where commentary and revision are interleaved.
 
 ### Phase 6: Session Persistence + Undo
 - [ ] localStorage auto-save (debounced 1s)
@@ -155,6 +155,11 @@ Refinements that improve the feel but aren't blockers.
 - [ ] Left slide-in overlay panel with app description, motivation, GitHub link, and credits
 - [ ] Triggered by discrete info icon next to app title; closes via backdrop click or Escape
 - [ ] Spec: `docs/about-panel.md`
+
+### Prominent Import Button (Default State)
+- [ ] When the app loads with placeholder text (no locally saved session), style the Import button with primary coloring or heavy stroke to draw attention
+- [ ] Should use an existing Tailwind/library style for visual consistency — prominent but not jarring
+- [ ] Revert to normal button styling once user has imported content or started editing
 
 ### Editor Polish
 - [ ] Paragraph-level deletions (CriticMarkup can't span paragraph boundaries)
