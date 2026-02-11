@@ -110,6 +110,7 @@ Domain purchased via Cloudflare. Connected to GitHub Pages deployment.
 - [x] **Vite base path:** Changed from `'/markdown-feedback/'` to `'/'`
 - [x] **Update references:** Live URL updated in `README.md`, `CLAUDE.md`, `AboutPanel.tsx`
 - [x] **Verify:** `https://markdown-feedback.com` loads correctly, SSL valid via Cloudflare
+- [x] **HTTPS enforcement:** GitHub Pages `https_enforced: true`, Let's Encrypt cert provisioned (required temporarily disabling Cloudflare proxy)
 
 ### Responsive Design + About Panel
 
@@ -158,8 +159,8 @@ Refinements that improve the feel but aren't blockers.
 ### Per-character deletion cursor dead zones (fixed)
 - [x] ~~Backspacing through original text created one `contenteditable=false` span per character, forming a cursor dead zone~~ — fixed: `handleSingleCharDelete` now reuses the ID of an adjacent standalone deletion mark. ProseMirror merges marks with equal attributes into a single DOM span, eliminating the wall of adjacent non-editable elements. See `docs/deletion-span-solutions.md` for the full analysis.
 
-### Changes panel overflow
-- [ ] Right-side changes/comment panel viewport area is not locked to the bottom of the screen — panel extends beyond viewport instead of scrolling internally
+### Changes panel overflow (fixed)
+- [x] ~~Right-side changes/comment panel viewport area is not locked to the bottom of the screen — panel extends beyond viewport instead of scrolling internally~~ — fixed: switched from page-scrollable layout with `sticky` panel to viewport-locked flex layout (`h-dvh`). Editor and panel scroll independently within their columns.
 
 ### Serialization edge cases
 - [ ] Substitution over text that already contains old deletions — old deletions emit as standalone `{--…--}` outside the `{~~…~~}`, which is semantically correct but may look odd

@@ -278,29 +278,35 @@ export default function Editor() {
   )
 
   return (
-    <div className="max-w-7xl mx-auto p-4 lg:p-6">
-      <Toolbar
-        onImportClick={() => setImportOpen(true)}
-        onAboutToggle={() => setAboutOpen((prev) => !prev)}
-        onPanelToggle={() => setPanelOpen((prev) => !prev)}
-        isPanelOpen={panelOpen}
-        changeCount={changes.length}
-        markup={rawMarkup}
-      />
+    <div className="max-w-7xl mx-auto px-4 lg:px-6 flex flex-col h-dvh overflow-hidden">
+      <div className="flex-shrink-0 pt-4 lg:pt-6">
+        <Toolbar
+          onImportClick={() => setImportOpen(true)}
+          onAboutToggle={() => setAboutOpen((prev) => !prev)}
+          onPanelToggle={() => setPanelOpen((prev) => !prev)}
+          isPanelOpen={panelOpen}
+          changeCount={changes.length}
+          markup={rawMarkup}
+        />
+      </div>
 
-      <div className="lg:flex lg:gap-4">
-        <div className="flex-1 min-w-0">
+      <div className="flex flex-col lg:flex-row lg:gap-4 flex-1 min-h-0">
+        <div className="flex-1 min-w-0 min-h-0 overflow-y-auto pb-4 lg:pb-6">
           <div className="border border-gray-300 rounded-lg bg-white shadow-sm">
             <EditorContent editor={editor} />
           </div>
+
+          <SourceView
+            markup={debouncedMarkup}
+            isExpanded={sourceExpanded}
+            onToggle={() => setSourceExpanded((prev) => !prev)}
+          />
         </div>
 
         {/* Desktop inline panel */}
         {panelOpen && (
-          <div className="hidden lg:block w-80 flex-shrink-0">
-            <div className="border-l border-gray-200 h-[calc(100vh-10rem)] sticky top-6 overflow-y-auto">
-              {changesPanelElement}
-            </div>
+          <div className="hidden lg:block w-80 flex-shrink-0 overflow-y-auto border-l border-gray-200">
+            {changesPanelElement}
           </div>
         )}
       </div>
@@ -323,12 +329,6 @@ export default function Editor() {
           {changesPanelElement}
         </div>
       </div>
-
-      <SourceView
-        markup={debouncedMarkup}
-        isExpanded={sourceExpanded}
-        onToggle={() => setSourceExpanded((prev) => !prev)}
-      />
 
       <ImportModal
         isOpen={importOpen}

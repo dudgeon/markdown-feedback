@@ -332,8 +332,12 @@ Custom domain set via `gh api repos/dudgeon/markdown-feedback/pages -X PUT -f cn
 
 Changed from `'/markdown-feedback/'` to `'/'`. The old `dudgeon.github.io/markdown-feedback/` URL now redirects to `markdown-feedback.com`. Dev server URL changed from `localhost:5173/markdown-feedback/` to `localhost:5173/`.
 
+### HTTPS enforcement
+
+GitHub Pages HTTPS enforcement is enabled (`https_enforced: true`). To provision the Let's Encrypt cert, we temporarily disabled the Cloudflare proxy (orange → grey cloud) on both CNAME records, removed and re-added the custom domain via `gh api` to trigger cert provisioning, waited for the cert state to reach "approved", enabled enforcement, then re-enabled the Cloudflare proxy. HTTP requests to `markdown-feedback.com` now 301-redirect to HTTPS.
+
 ### Implementation notes
 
 - Wrangler CLI lacks DNS management commands; Cloudflare API tokens from other projects were scoped to different zones. DNS records were created via the Cloudflare dashboard.
-- GitHub Pages HTTPS enforcement requires the Let's Encrypt cert to be provisioned first (depends on DNS propagation). Cloudflare handles HTTPS for visitors immediately via its edge cert, so this is non-blocking.
+- Cloudflare proxy must be temporarily disabled for GitHub to verify domain ownership and issue a Let's Encrypt cert. Once the cert is provisioned and HTTPS enforcement is on, the proxy can be safely re-enabled.
 - Cloudflare caches the HTML page; after deploying a new build with updated asset paths, a hard refresh (Cmd+Shift+R) was needed to bypass the cached version.
