@@ -92,4 +92,5 @@ npm run preview        # Preview production build
 - [docs/prd.md](docs/prd.md) — Full product requirements (intercept architecture)
 - [docs/project-context.md](docs/project-context.md) — Decision log and project context
 - [docs/docx-import.md](docs/docx-import.md) — DOCX import architecture (Phase 7)
+- [CHANGELOG.md](CHANGELOG.md) — Release history
 - [CLAUDE.md](CLAUDE.md) — AI coding assistant instructions

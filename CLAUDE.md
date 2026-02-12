@@ -151,6 +151,8 @@ README.md                  # Project overview (public-facing)
 CLAUDE.md                  # AI coding assistant instructions
 BACKLOG.md                 # Roadmap + feature backlog
 CHANGELOG.md               # Release history
+vite.config.ts             # Standard Vite config (GitHub Pages build)
+vite.config.singlefile.ts  # Single-file HTML build config
 docs/                      # Specification & design documents
   prd.md                   # Product requirements document
   project-context.md       # Decision log & project context
@@ -161,6 +163,8 @@ src/                       # Application source code
   extensions/              # TipTap/ProseMirror extensions
   hooks/                   # Custom React hooks
   utils/                   # Pure utility functions
+.claude/commands/          # Custom slash commands
+  release.md               # /release — changelog, tag, build, publish
 .github/workflows/         # CI/CD (GitHub Pages deployment)
 ```
 
@@ -196,6 +200,10 @@ If a scaffold is needed:
 ### Keep About Panel Current
 
 When adding or changing user-facing keyboard shortcuts, features, or workflows, update the "Keyboard Shortcuts" section in the About panel (`src/components/AboutPanel.tsx` or equivalent) to reflect the change. The About panel is the user's reference for how to use the app.
+
+### Verify All URLs
+
+Every URL written into README, docs, or code must be verified before committing. Run `gh api`, `curl`, or another check to confirm the resource exists. Never guess GitHub usernames — always check `git remote get-url origin`.
 
 ## Relevant Skills for This Build
 

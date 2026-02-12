@@ -102,6 +102,13 @@ Import a `.docx` file exported from Google Docs (with Suggesting mode edits) and
 - Lists: `word/numbering.xml` parsed to map `(numId, ilvl)` → `bullet`/`decimal`, emitted as `- ` or `1. ` prefixes.
 - Entries joined with `\n\n` (not `\n`) because `criticMarkupToHTML` splits blocks on double-newline.
 
+### Single-File Build + Release Process
+- [x] `vite-plugin-singlefile` integration — `npm run build:single` produces a single self-contained HTML file (`dist-single/index.html`) with all JS, CSS, and assets inlined
+- [x] Separate Vite config (`vite.config.singlefile.ts`) so normal GitHub Pages build is unaffected
+- [x] `/release` slash command — discovers unreleased commits, writes changelog, builds single-file HTML, tags, pushes, creates GitHub release with HTML asset attached
+- [x] `CHANGELOG.md` created with v1.0.0 entry
+- [x] README updated with download link, trust model, and build instructions
+
 ### Spike: Custom Domain (`markdown-feedback.com`) (COMPLETE)
 Domain purchased via Cloudflare. Connected to GitHub Pages deployment.
 
