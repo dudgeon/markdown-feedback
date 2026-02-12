@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:single": "tsc -b && vite build --config vite.config.singlefile.ts"
   },
   "dependencies": {
     "@tiptap/pm": "^3.19.0",
@@ -32,6 +33,7 @@
     "tailwindcss": "^4.1.18",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
-    "vite": "^7.2.4"
+    "vite": "^7.2.4",
+    "vite-plugin-singlefile": "^2.3.0"
   }
 }

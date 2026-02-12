@@ -32,7 +32,34 @@ The team {~~delivered the results~>presented their findings~~}{>>active voice is
 {++A new concluding thought.++}
 ```
 
-## Quick Start
+## Run Locally (Single HTML File)
+
+If you can't access the hosted version — or prefer not to send any traffic to an external site — you can run Markdown Feedback as a single, self-contained HTML file. No server, no install, no network access required.
+
+1. Download `index.html` from the [latest release](https://github.com/geoffreydudgeon/markdown-feedback/releases/latest), or build it yourself:
+
+```bash
+# Requires Node 20+
+npm install
+npm run build:single    # outputs dist-single/index.html
+```
+
+2. Open `dist-single/index.html` in any browser.
+
+That's it. The entire application — editor, track changes, import/export, .docx support — runs from that one file.
+
+### Trust model
+
+Markdown Feedback is a **fully client-side application**. There is no server, no backend, no analytics, and no network requests. Your documents never leave your browser.
+
+- **No data transmission.** The app makes zero network calls. It works offline, from a `file://` URL, or air-gapped.
+- **No external dependencies at runtime.** All libraries (React, the editor engine, .docx parser) are bundled into the HTML file. Nothing is fetched from a CDN.
+- **No persistent storage beyond your browser.** Session recovery uses `localStorage` (same-origin, never transmitted). Closing the tab or clearing browser data removes it entirely.
+- **Fully auditable.** The file is ~730 KB of minified JavaScript and CSS. The source code is MIT-licensed and available in this repository.
+
+This means it's safe to use on corporate networks, behind firewalls, or in environments with strict data handling policies — your content stays on your machine.
+
+## Quick Start (Development)
 
 ```bash
 # Requires Node 20+
@@ -43,10 +70,11 @@ npm run dev       # http://localhost:5173/
 ## Commands
 
 ```bash
-npm run dev       # Vite dev server with HMR
-npm run build     # TypeScript check + production build
-npm run lint      # ESLint
-npm run preview   # Preview production build
+npm run dev            # Vite dev server with HMR
+npm run build          # TypeScript check + production build
+npm run build:single   # Single self-contained HTML file
+npm run lint           # ESLint
+npm run preview        # Preview production build
 ```
 
 ## Tech Stack
