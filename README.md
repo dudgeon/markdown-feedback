@@ -36,7 +36,7 @@ The team {~~delivered the results~>presented their findings~~}{>>active voice is
 
 If you can't access the hosted version — or prefer not to send any traffic to an external site — you can run Markdown Feedback as a single, self-contained HTML file. No server, no install, no network access required.
 
-1. Build it from source:
+1. Download `index.html` from the [latest release](https://github.com/dudgeon/markdown-feedback/releases/latest), or build it from source:
 
 ```bash
 # Requires Node 20+
