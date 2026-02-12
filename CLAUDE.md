@@ -15,11 +15,23 @@ Full specification lives in `docs/prd.md` and `docs/project-context.md`. Roadmap
 ## Commands
 
 ```bash
-npm run dev      # Start Vite dev server with HMR
-npm run build    # TypeScript check + Vite production build
-npm run lint     # ESLint (flat config, TS + React)
-npm run preview  # Preview production build locally
+npm run dev            # Start Vite dev server with HMR
+npm run build          # TypeScript check + Vite production build
+npm run build:single   # Single self-contained HTML file (output: dist-single/index.html)
+npm run lint           # ESLint (flat config, TS + React)
+npm run preview        # Preview production build locally
 ```
+
+## Releases
+
+Use the `/release` slash command to create a new release. It handles the full lifecycle:
+1. Discovers unreleased commits since the last tag
+2. Summarizes changes and suggests a version
+3. Creates/updates CHANGELOG.md
+4. Builds the single-file HTML (`npm run build:single`)
+5. Commits, tags, pushes, and creates a GitHub release with `dist-single/index.html` attached
+
+Release history lives in `CHANGELOG.md`. Each GitHub release has the single-file HTML attached so users behind firewalls can download it directly.
 
 ## Tech Stack
 
@@ -138,6 +150,7 @@ Tailwind's preflight CSS strips browser defaults including `list-style-type`, `m
 README.md                  # Project overview (public-facing)
 CLAUDE.md                  # AI coding assistant instructions
 BACKLOG.md                 # Roadmap + feature backlog
+CHANGELOG.md               # Release history
 docs/                      # Specification & design documents
   prd.md                   # Product requirements document
   project-context.md       # Decision log & project context
