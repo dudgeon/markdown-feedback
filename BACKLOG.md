@@ -233,6 +233,13 @@ Refinements that improve the feel but aren't blockers.
 - [ ] Include: Cmd+Shift+H (highlight), Tab (jump to comment input when on a change), Enter/Tab in comment input (save/return to editor)
 - [ ] Keep in sync as new shortcuts are added
 
+### Pause Track Changes Mode
+- [ ] Add a toggle to pause/resume track changes interception — when paused, edits behave like a normal editor (no deletion marks, no insertion marks, no substitution detection)
+- [ ] Visual indicator in the toolbar showing current tracking state (e.g. "Tracking" / "Paused")
+- [ ] Keyboard shortcut to toggle (e.g. Cmd+Shift+T or similar)
+- [ ] When resumed, new edits are tracked again from that point forward — previously tracked changes remain intact
+- [ ] Useful for rebaselining sections of a document or making structural edits the user doesn't want recorded as changes
+
 ### Accept / Reject
 - [ ] Accept/reject individual changes to produce a clean document
 - [ ] Accept all / Reject all bulk operations
