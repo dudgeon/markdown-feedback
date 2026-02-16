@@ -10,7 +10,7 @@ Full specification lives in `docs/prd.md` and `docs/project-context.md`. Roadmap
 
 **Live:** https://markdown-feedback.com
 
-**Status:** Phase 7 IN PROGRESS (DOCX import — Phases A–D complete, E partial). See BACKLOG.md for details.
+**Status:** Phase 8A+B COMPLETE (Zustand store extraction + track changes toggle). Phase 7E (DOCX polish) partial. See BACKLOG.md for details.
 
 ## Commands
 
@@ -39,6 +39,7 @@ Release history lives in `CHANGELOG.md`. Each GitHub release has the single-file
 - **TipTap 3** (ProseMirror wrapper) — editor framework
 - **Tailwind CSS 4** (via `@tailwindcss/vite` plugin)
 - **Vite 7** — build tool
+- **Zustand** — lightweight state management (document store)
 - **nanoid** — unique IDs for tracked change spans
 - **JSZip** — client-side .docx extraction (dynamic import, only loaded on .docx import)
 
@@ -54,12 +55,14 @@ This project uses an intercept-based architecture, NOT a diff-based approach. Ev
   - `TrackedDeletion` mark — red strikethrough, `contenteditable=false`, non-inclusive
   - `TrackedInsertion` mark — green text, inclusive (extends when typing at edges)
   - `TrackedHighlight` mark — yellow highlight for standalone comments, non-inclusive
-  - `TrackChanges` extension — uses `handleKeyDown`, `handleTextInput`, and `handlePaste` to intercept edits directly. Also handles Tab-to-comment (when cursor is on a change) and Cmd+Shift+H to create highlights.
+  - `TrackChanges` extension — uses `handleKeyDown`, `handleTextInput`, and `handlePaste` to intercept edits directly. Also handles Tab-to-comment (when cursor is on a change), Cmd+Shift+H to create highlights, and Cmd+Shift+T to toggle tracking. Track changes toggle state is a module-level variable (`_trackingEnabled`) — NOT TipTap `addStorage()`, which resets on `useEditor` re-render. `appendTransaction` strips inclusive insertion marks from untracked text when tracking is off.
 - `src/utils/serializeCriticMarkup.ts` — Walks ProseMirror doc tree and emits CriticMarkup string. Accepts a `comments` Record to emit `{>>comment<<}` after changes and `{==text==}{>>comment<<}` for highlights. Key design: `pairedWith !== null` distinguishes substitution parts from standalone changes.
 - `src/utils/parseCriticMarkup.ts` — Reverse of serializer. `parseCriticMarkup()` tokenizes a CriticMarkup string into typed segments including highlights and comments; `criticMarkupToHTML()` returns `{ html, comments }` — the HTML with tracked-change spans, and a Record mapping change IDs to comment text. `extractCommentsFromSegments()` links comment tokens to their preceding change/highlight.
 - `src/utils/exportDocument.ts` — Export functions: `exportCriticMarkup()` (YAML frontmatter + markup), `exportClean()` (accept all changes), `exportOriginal()` (reject all changes), `countChanges()`, `downloadFile()`. Both clean and original exports strip `{==...==}` highlight markers.
 - `src/utils/extractChanges.ts` — Walks ProseMirror doc tree and extracts a structured `ChangeEntry[]` list with type (deletion/insertion/substitution/highlight), text, context snippets, positions, and optional comment text. Accepts a `comments` Record to merge into entries.
-- `src/components/Editor.tsx` — TipTap editor setup with two-column layout, toolbar, serialization wiring, source view, comment state management, and session persistence. Comments live in React state as `Record<string, string>` (keyed by change/highlight ID). Orphaned comments are pruned on every editor update. Custom events bridge the TrackChanges plugin keyboard shortcuts to React state. Auto-saves to localStorage (debounced 1s) and shows recovery modal on load if a previous session exists.
+- `src/stores/documentStore.ts` — Zustand store owning all document state (comments, changes, rawMarkup, trackingEnabled, focusCommentId, recovery state) and actions (handleEditorChange, importDocument, setComment, toggleTracking, etc.). Editor instance stored non-reactively. Persistence via `stores/persistence/` abstraction layer.
+- `src/stores/persistence/` — Platform-abstracted persistence (types.ts interface, web.ts localStorage adapter, index.ts factory). Future: Tauri fs adapter.
+- `src/components/Editor.tsx` — Thin layout shell consuming Zustand store. Owns UI-only toggles (sourceExpanded, importOpen, panelOpen, aboutOpen), TipTap `useEditor` setup, debounced values, auto-save effect, and DOM event listeners bridging plugin shortcuts to store actions.
 - `src/components/ChangesPanel.tsx` — Right sidebar listing all tracked changes and highlights in document order. Shows change type badge, context snippets with inline highlighting, click-to-scroll, and per-entry comment input (auto-save on blur, Tab/Enter to save and return to editor).
 - `src/utils/parseDocx.ts` — Entry point for .docx import. Takes an ArrayBuffer, extracts XML files via JSZip (dynamic import), parses with DOMParser, and calls `docxToMarkdown()`. Extracts `word/document.xml`, `word/comments.xml`, and `word/numbering.xml`.
 - `src/utils/docxToMarkdown.ts` — OOXML walker that converts parsed XML DOMs to a CriticMarkup markdown string. Handles tracked changes (`<w:ins>`, `<w:del>` in both orderings), comments, comment-to-change attribution, and list detection via numbering.xml.
@@ -70,7 +73,6 @@ This project uses an intercept-based architecture, NOT a diff-based approach. Ev
 - `src/components/Toolbar.tsx` — Top toolbar with about icon, title, Import (responsive), Export menu, and changes panel toggle with badge
 - `src/components/AboutPanel.tsx` — Left slide-in panel with app description, "Why I built this", GitHub link, and footer
 - `src/hooks/useDebouncedValue.ts` — Generic debounce hook for source view updates and auto-save
-- `src/hooks/useSessionPersistence.ts` — localStorage save/load/clear for session state (CriticMarkup string + comments map + timestamp)
 - `src/index.css` — Track changes visual styles + source view syntax highlighting
 
 ### Import Design Decision
@@ -90,6 +92,8 @@ Import always parses CriticMarkup tokens — there is no "Start fresh" vs "Resum
 | Tab on a tracked change | Focus comment input in Changes Panel for that change |
 | Tab on normal text | Normal behavior (indent/default) |
 | Cmd+Shift+H with text selected | Apply highlight mark, focus comment input |
+| Cmd+Shift+T | Toggle track changes on/off |
+| Tracking OFF + any edit | Normal ProseMirror behavior (no marks applied) |
 
 ### CriticMarkup Syntax (Target Output)
 

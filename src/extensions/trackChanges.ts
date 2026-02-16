@@ -3,6 +3,20 @@ import { Plugin, PluginKey, TextSelection } from '@tiptap/pm/state'
 import { EditorView } from '@tiptap/pm/view'
 import { nanoid } from 'nanoid'
 
+// Module-level tracking state — survives TipTap extension reconfiguration.
+// TipTap's useEditor can re-register extensions on re-render, which resets
+// addStorage() and re-runs addProseMirrorPlugins(). A module variable is
+// immune to this lifecycle.
+let _trackingEnabled = true
+
+export function getTrackingEnabled(): boolean {
+  return _trackingEnabled
+}
+
+export function setTrackingEnabled(enabled: boolean): void {
+  _trackingEnabled = enabled
+}
+
 /**
  * Mark: tracked-deletion
  * Applied to text that the user deleted from the original document.
@@ -140,7 +154,22 @@ export const TrackChanges = Extension.create({
             const { selection } = state
             const { from, to, empty } = selection
 
+            // Cmd+Shift+T (Mac) / Ctrl+Shift+T (Win): toggle tracking
+            // Always active regardless of _trackingEnabled
+            if (
+              event.key === 't' &&
+              event.shiftKey &&
+              (event.metaKey || event.ctrlKey)
+            ) {
+              event.preventDefault()
+              window.dispatchEvent(
+                new CustomEvent('trackchanges:toggle-tracking')
+              )
+              return true
+            }
+
             // Cmd+Shift+H (Mac) / Ctrl+Shift+H (Win): create highlight
+            // Always active regardless of _trackingEnabled
             if (
               event.key === 'h' &&
               event.shiftKey &&
@@ -155,6 +184,7 @@ export const TrackChanges = Extension.create({
             }
 
             // Tab: jump to comment input if cursor is on/adjacent to a change
+            // Always active regardless of _trackingEnabled
             if (event.key === 'Tab' && !event.shiftKey && !event.metaKey && !event.ctrlKey) {
               const changeId = findChangeIdAtCursor(state, from, deletionType, insertionType, highlightType)
               if (changeId) {
@@ -169,6 +199,9 @@ export const TrackChanges = Extension.create({
               return false // Let Tab function normally
             }
 
+            // Below this point: tracking-dependent behavior
+            if (!_trackingEnabled) return false
+
             if (event.key !== 'Backspace' && event.key !== 'Delete') {
               return false
             }
@@ -181,6 +214,7 @@ export const TrackChanges = Extension.create({
           },
 
           handleTextInput(view, from, to, text) {
+            if (!_trackingEnabled) return false
             const { state, dispatch } = view
             const $from = state.doc.resolve(from)
             const isInInsertion = insertionType.isInSet($from.marks())
@@ -209,6 +243,7 @@ export const TrackChanges = Extension.create({
           },
 
           handlePaste(view, _event, slice) {
+            if (!_trackingEnabled) return false
             const { state, dispatch } = view
             const { from, to } = state.selection
             const text = slice.content.textBetween(
@@ -238,6 +273,40 @@ export const TrackChanges = Extension.create({
               return handleSubstitution(view, from, to, text)
             }
           },
+        },
+
+        // When tracking is off, strip insertion marks from newly added text.
+        // TrackedInsertion is inclusive, so ProseMirror's default text input
+        // extends the mark onto adjacent new characters. This appendTransaction
+        // catches ALL input methods (keyboard, paste, composition, automation).
+        appendTransaction(transactions, _oldState, newState) {
+          if (_trackingEnabled) return null
+          if (!transactions.some((tr) => tr.docChanged)) return null
+
+          const tr = newState.tr
+          let modified = false
+
+          for (const transaction of transactions) {
+            if (!transaction.docChanged) continue
+            transaction.steps.forEach((step) => {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              step.getMap().forEach((_oldStart: any, _oldEnd: any, newStart: any, newEnd: any) => {
+                if (newEnd <= newStart) return
+                const safeEnd = Math.min(newEnd, newState.doc.content.size)
+                if (newStart >= safeEnd) return
+                newState.doc.nodesBetween(newStart, safeEnd, (node, pos) => {
+                  if (node.isText && insertionType.isInSet(node.marks)) {
+                    const from = Math.max(pos, newStart)
+                    const to = Math.min(pos + node.nodeSize, safeEnd)
+                    tr.removeMark(from, to, insertionType)
+                    modified = true
+                  }
+                })
+              })
+            })
+          }
+
+          return modified ? tr : null
         },
       }),
     ]

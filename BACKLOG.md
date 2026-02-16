@@ -107,8 +107,8 @@ Native macOS app via Tauri 2, with local file editing (Open/Save/SaveAs), track 
 
 **Prerequisites:** Safari browser testing to validate WKWebView compatibility before writing Tauri code.
 
-- [ ] **Phase A:** State management extraction — move comments, changes, markup, and document lifecycle out of Editor.tsx into a dedicated store. Abstract persistence interface (web: localStorage, desktop: Tauri fs). Web app behavior unchanged.
-- [ ] **Phase B:** Track changes toggle — `enabled` flag in TipTap extension storage, all three handlers check flag and passthrough when disabled. Toolbar toggle + Cmd+Shift+T shortcut. Ships on web too.
+- [x] **Phase A:** State management extraction — moved document state from Editor.tsx into Zustand store (`documentStore.ts`). Abstract persistence layer (`stores/persistence/`). Web app behavior unchanged.
+- [x] **Phase B:** Track changes toggle — module-level `_trackingEnabled` flag, all three handlers check flag and passthrough when disabled. Toolbar toggle pill + Cmd+Shift+T shortcut. `appendTransaction` strips inclusive insertion marks from untracked text. Keyboard shortcuts section added to About panel. Ships on web.
 - [ ] **Phase C:** Tauri shell — `src-tauri/` boilerplate, `tauri.conf.json` pointing at Vite, verify editor works in WKWebView. No native features yet — just the web app in a native window.
 - [ ] **Phase D:** Native file operations — Open/Save/SaveAs via `@tauri-apps/plugin-dialog` + `@tauri-apps/plugin-fs`. Native menu bar (File/Edit/View). Dirty state in title bar. File associations for `.md` and `.docx`. Cmd+S saves to disk.
 - [ ] **Phase E:** Mac App Store preparation — sandbox entitlements, universal binary, code signing, notarization, GitHub Actions CI for macOS build, DMG for direct distribution.
@@ -118,7 +118,7 @@ Native macOS app via Tauri 2, with local file editing (Open/Save/SaveAs), track 
 - Tauri 2 chosen over Electron (3-8 MB binary vs 150-400 MB; WKWebView = no private API risk for MAS) and Swift+WKWebView (cross-platform > macOS-only).
 - Platform adapter pattern with runtime detection (`window.__TAURI__`), not build-time branching. `npm run dev` and `npm run build` never touch Tauri.
 - State extraction (Phase A) is the prerequisite refactor — avoids cementing Editor.tsx as a God component before adding file path, dirty state, and tracking toggle.
-- Track changes toggle (Phase B) lives in TipTap extension storage, not React state. Text typed with tracking off becomes indistinguishable from "original" text (intentional, matches Word/Google Docs behavior).
+- Track changes toggle (Phase B) uses a module-level variable in `trackChanges.ts` (not TipTap extension storage, which resets on `useEditor` re-render). Text typed with tracking off becomes indistinguishable from "original" text (intentional, matches Word/Google Docs behavior).
 - Save format is CriticMarkup with YAML frontmatter (same as current export). Round-trip safe.
 - **Known defect (accepted):** iOS virtual keyboard does not reliably fire `keydown` for Backspace/Delete. Deletion tracking may not work on iOS without a hardware keyboard. Mitigation: add `handleDOMEvents.beforeinput` handler when iOS target is actively developed. Does not affect macOS or web. See spec §8.1 for full analysis.
 
@@ -253,10 +253,10 @@ Refinements that improve the feel but aren't blockers.
 - [ ] Position using ProseMirror's `coordsAtPos` or the browser Selection API `getBoundingClientRect`
 - [ ] Complements the existing Cmd+Shift+H shortcut for users who don't know the keyboard shortcut
 
-### Keyboard Shortcuts in About Panel
-- [ ] Add a "Keyboard Shortcuts" section to the About panel listing all user-facing shortcuts
-- [ ] Include: Cmd+Shift+H (highlight), Tab (jump to comment input when on a change), Enter/Tab in comment input (save/return to editor)
-- [ ] Keep in sync as new shortcuts are added
+### Keyboard Shortcuts in About Panel (COMPLETE — Phase 8B)
+- [x] Add a "Keyboard Shortcuts" section to the About panel listing all user-facing shortcuts
+- [x] Include: Cmd+Shift+T (toggle tracking), Cmd+Shift+H (highlight), Tab (jump to comment input when on a change), Enter/Tab in comment input (save/return to editor)
+- [x] Keep in sync as new shortcuts are added
 
 ### Accept / Reject
 - [ ] Accept/reject individual changes to produce a clean document

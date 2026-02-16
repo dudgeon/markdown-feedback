@@ -80,6 +80,28 @@ export default function AboutPanel({ isOpen, onClose }: AboutPanelProps) {
             pasting sensitive content on shared computers.
           </p>
 
+          <p className="mt-6 text-[10px] font-semibold tracking-widest uppercase text-gray-400">
+            Keyboard Shortcuts
+          </p>
+
+          <div className="mt-3 space-y-2">
+            <div className="flex items-baseline justify-between text-sm">
+              <span className="text-gray-700">Toggle tracking</span>
+              <kbd className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded font-mono">Cmd+Shift+T</kbd>
+            </div>
+            <div className="flex items-baseline justify-between text-sm">
+              <span className="text-gray-700">Highlight + comment</span>
+              <kbd className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded font-mono">Cmd+Shift+H</kbd>
+            </div>
+            <div className="flex items-baseline justify-between text-sm">
+              <span className="text-gray-700">Jump to comment</span>
+              <kbd className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded font-mono">Tab</kbd>
+            </div>
+            <p className="text-xs text-gray-500 leading-relaxed">
+              Tab jumps to the comment input when the cursor is on a tracked change. In the comment input, Enter saves and Tab returns to the editor.
+            </p>
+          </div>
+
           <div className="mt-6">
             <a
               href="https://github.com/dudgeon/markdown-feedback"

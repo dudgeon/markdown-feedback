@@ -308,6 +308,29 @@ Three bugs were found during browser testing with a real Google Docs export:
 
 3. **Comment-on-substitution key mismatch.** `extractCommentsFromSegments()` (in `parseCriticMarkup.ts`) keyed comments by the insertion's ID, but `extractChanges()` identifies substitution entries by the deletion's ID. Comments on substitutions appeared as "unlinked" in the Changes Panel. Fix: when the preceding segment is an insertion with `pairedWith`, use the `pairedWith` value (deletion's ID) as the comment key.
 
+## 12. Phase 8A+B: State Extraction + Track Changes Toggle
+
+**Date:** 2026-02-16
+
+### Why Zustand over React Context
+
+Editor.tsx was a 353-line God component owning 12 state vars, 10 callbacks, and 4 effects. Adding desktop features (file path, dirty state, tracking toggle) would have made it unmaintainable. Zustand was chosen because:
+
+- `set()` is **synchronous** — eliminated the `commentsRef` timing hack where `setContent()` fires `onUpdate` synchronously and needed to read the current comments.
+- No Provider — store is a plain module import, accessible from DOM event handlers and future Tauri menu events.
+- Selector subscriptions — only components reading specific slices re-render.
+- Actions are stable references — eliminated 8+ `useCallback` wrappers.
+
+### TipTap `addStorage()` trap
+
+Track changes toggle was initially implemented using TipTap's `addStorage()` to store an `enabled` flag. This failed because `useEditor` re-registers extensions when React re-renders with new option references (inline arrays, new closures). Re-registration calls `addStorage()` again, resetting the flag to its initial `true` value.
+
+**Fix:** Module-level variable (`let _trackingEnabled = true`) in `trackChanges.ts` with exported getter/setter. Module variables survive extension re-creation. The Zustand store's `toggleTracking` action updates both the module variable (for the plugin) and the store state (for the UI).
+
+### `appendTransaction` for inclusive mark stripping
+
+When tracking is off, text typed adjacent to an existing `TrackedInsertion` mark (which has `inclusive: true`) inherits the mark via ProseMirror's default behavior. The `appendTransaction` plugin hook iterates over changed ranges in each transaction and strips insertion marks from newly added text. This catches all input methods (keyboard, paste, composition, automation).
+
 Lists were also added: `word/numbering.xml` is parsed to build a `(numId, ilvl) → 'bullet' | 'decimal'` map. List paragraphs emit `- ` or `1. ` prefixes. Entries are joined with `\n\n` to match `criticMarkupToHTML`'s block separator.
 
 Phase E remaining work: hyperlinks, tables, moves, and edge case polishing.

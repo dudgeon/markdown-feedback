@@ -1,8 +1,6 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
-import type { Editor as TipTapEditor } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
-import { nanoid } from 'nanoid'
 import {
   TrackedDeletion,
   TrackedInsertion,
@@ -14,15 +12,10 @@ import ImportModal from './ImportModal'
 import Toolbar from './Toolbar'
 import ChangesPanel from './ChangesPanel'
 import AboutPanel from './AboutPanel'
-import { serializeCriticMarkup } from '../utils/serializeCriticMarkup'
-import { extractChanges, type ChangeEntry } from '../utils/extractChanges'
+import RecoveryModal from './RecoveryModal'
 import { criticMarkupToHTML } from '../utils/parseCriticMarkup'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
-import {
-  useSessionPersistence,
-  type SavedSession,
-} from '../hooks/useSessionPersistence'
-import RecoveryModal from './RecoveryModal'
+import { useDocumentStore } from '../stores/documentStore'
 
 const SAMPLE_MARKDOWN = `# Selected Passages from *The Elements of Style*
 
@@ -39,50 +32,35 @@ Write with nouns and verbs, not with adjectives and adverbs. The adjective hasn'
 **Source:** Strunk, William Jr., and E.B. White. *The Elements of Style*. 4th ed., Longman, 2000.`
 
 export default function Editor() {
-  const [rawMarkup, setRawMarkup] = useState('')
-  const [changes, setChanges] = useState<ChangeEntry[]>([])
-  const [comments, setComments] = useState<Record<string, string>>({})
+  // UI-only local state
   const [sourceExpanded, setSourceExpanded] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
-  const [focusCommentId, setFocusCommentId] = useState<string | null>(null)
   const [panelOpen, setPanelOpen] = useState(true)
   const [aboutOpen, setAboutOpen] = useState(false)
-  const [showRecovery, setShowRecovery] = useState(false)
-  const [recoverySession, setRecoverySession] = useState<SavedSession | null>(
-    null
-  )
 
-  const { getSavedSession, saveSession, clearSession } =
-    useSessionPersistence()
+  // Store state
+  const rawMarkup = useDocumentStore((s) => s.rawMarkup)
+  const changes = useDocumentStore((s) => s.changes)
+  const trackingEnabled = useDocumentStore((s) => s.trackingEnabled)
+  const focusCommentId = useDocumentStore((s) => s.focusCommentId)
+  const showRecovery = useDocumentStore((s) => s.showRecovery)
+  const recoverySession = useDocumentStore((s) => s.recoverySession)
 
-  // Ref to avoid stale closures in handleEditorChange
-  const commentsRef = useRef(comments)
-  commentsRef.current = comments
+  // Store actions (stable references)
+  const setEditor = useDocumentStore((s) => s.setEditor)
+  const handleEditorChange = useDocumentStore((s) => s.handleEditorChange)
+  const importDocument = useDocumentStore((s) => s.importDocument)
+  const setComment = useDocumentStore((s) => s.setComment)
+  const scrollToChange = useDocumentStore((s) => s.scrollToChange)
+  const clearFocusComment = useDocumentStore((s) => s.clearFocusComment)
+  const returnToEditor = useDocumentStore((s) => s.returnToEditor)
+  const toggleTracking = useDocumentStore((s) => s.toggleTracking)
+  const checkForRecovery = useDocumentStore((s) => s.checkForRecovery)
+  const resumeSession = useDocumentStore((s) => s.resumeSession)
+  const startFresh = useDocumentStore((s) => s.startFresh)
+  const saveSession = useDocumentStore((s) => s.saveSession)
 
   const debouncedMarkup = useDebouncedValue(rawMarkup, 500)
-
-  const handleEditorChange = useCallback(
-    ({ editor }: { editor: TipTapEditor }) => {
-      setRawMarkup(serializeCriticMarkup(editor.state.doc, commentsRef.current))
-      const currentChanges = extractChanges(editor.state.doc, commentsRef.current)
-      setChanges(currentChanges)
-
-      // Prune orphaned comments
-      const validIds = new Set(currentChanges.map((c) => c.id))
-      setComments((prev) => {
-        const pruned = { ...prev }
-        let changed = false
-        for (const key of Object.keys(pruned)) {
-          if (!validIds.has(key)) {
-            delete pruned[key]
-            changed = true
-          }
-        }
-        return changed ? pruned : prev
-      })
-    },
-    []
-  )
 
   const { html: initialHTML, comments: initialComments } =
     criticMarkupToHTML(SAMPLE_MARKDOWN)
@@ -96,133 +74,45 @@ export default function Editor() {
       TrackChanges,
     ],
     content: initialHTML,
-    onUpdate: handleEditorChange,
+    onUpdate: ({ editor }) => handleEditorChange(editor),
     onCreate: ({ editor }) => {
-      // Load initial comments from sample content
+      setEditor(editor)
       if (Object.keys(initialComments).length > 0) {
-        setComments(initialComments)
+        useDocumentStore.setState({ comments: initialComments })
       }
-      handleEditorChange({ editor })
+      handleEditorChange(editor)
     },
   })
 
-  const handleImport = useCallback(
-    (text: string) => {
-      if (!editor) return
-      const { html, comments: importedComments } = criticMarkupToHTML(text)
-      // Update ref BEFORE setContent so handleEditorChange picks up the new comments
-      commentsRef.current = importedComments
-      setComments(importedComments)
-      editor.commands.setContent(html)
-    },
-    [editor]
-  )
-
-  const handleScrollTo = useCallback(
-    (from: number, to: number) => {
-      if (!editor) return
-      editor.commands.setTextSelection({ from, to })
-      editor.commands.scrollIntoView()
-      editor.commands.focus()
-    },
-    [editor]
-  )
-
-  const handleCommentChange = useCallback(
-    (id: string, text: string) => {
-      setComments((prev) => {
-        const next = { ...prev }
-        if (text) {
-          next[id] = text
-        } else {
-          delete next[id]
-        }
-        return next
-      })
-      // Re-serialize and re-extract with the updated comment
-      if (editor) {
-        const updatedComments = { ...commentsRef.current }
-        if (text) updatedComments[id] = text
-        else delete updatedComments[id]
-        setRawMarkup(serializeCriticMarkup(editor.state.doc, updatedComments))
-        setChanges(extractChanges(editor.state.doc, updatedComments))
-      }
-    },
-    [editor]
-  )
-
-  const handleReturnToEditor = useCallback(() => {
-    if (!editor) return
-    editor.commands.focus()
-  }, [editor])
-
-  const handleFocusHandled = useCallback(() => {
-    setFocusCommentId(null)
-  }, [])
-
-  // Tab-to-comment: called from TrackChanges plugin via custom event
-  // Cmd+Shift+H: create highlight on selection
-  // These are wired via DOM events since the plugin can't access React state directly
-
-  // Listen for custom events from the TrackChanges plugin
-  const handleTabToComment = useCallback(
-    (e: Event) => {
+  // Custom DOM events from TrackChanges plugin
+  useEffect(() => {
+    const handleTab = (e: Event) => {
       const detail = (e as CustomEvent).detail
       if (detail?.changeId) {
-        setFocusCommentId(detail.changeId)
-        // On mobile, open the panel if it's closed
+        useDocumentStore.getState().setFocusCommentId(detail.changeId)
         setPanelOpen(true)
       }
-    },
-    []
-  )
-
-  const handleCreateHighlight = useCallback(
-    () => {
-      if (!editor) return
-      const { from, to } = editor.state.selection
-      if (from === to) return
-      const id = nanoid(8)
-      const { tr } = editor.state
-      tr.addMark(
-        from,
-        to,
-        editor.schema.marks.trackedHighlight.create({ id })
-      )
-      editor.view.dispatch(tr)
-      // Focus the comment input for this new highlight
-      setFocusCommentId(id)
-      setPanelOpen(true)
-    },
-    [editor]
-  )
-
-  // Attach event listeners for custom events from the TrackChanges plugin
-  useEffect(() => {
-    window.addEventListener('trackchanges:tab-to-comment', handleTabToComment)
-    window.addEventListener(
-      'trackchanges:create-highlight',
-      handleCreateHighlight
-    )
-    return () => {
-      window.removeEventListener(
-        'trackchanges:tab-to-comment',
-        handleTabToComment
-      )
-      window.removeEventListener(
-        'trackchanges:create-highlight',
-        handleCreateHighlight
-      )
     }
-  }, [handleTabToComment, handleCreateHighlight])
+    const handleHighlight = () => {
+      useDocumentStore.getState().createHighlight()
+      setPanelOpen(true)
+    }
+    const handleToggle = () => {
+      useDocumentStore.getState().toggleTracking()
+    }
+    window.addEventListener('trackchanges:tab-to-comment', handleTab)
+    window.addEventListener('trackchanges:create-highlight', handleHighlight)
+    window.addEventListener('trackchanges:toggle-tracking', handleToggle)
+    return () => {
+      window.removeEventListener('trackchanges:tab-to-comment', handleTab)
+      window.removeEventListener('trackchanges:create-highlight', handleHighlight)
+      window.removeEventListener('trackchanges:toggle-tracking', handleToggle)
+    }
+  }, [])
 
   // Check for saved session on mount
   useEffect(() => {
-    const saved = getSavedSession()
-    if (saved) {
-      setRecoverySession(saved)
-      setShowRecovery(true)
-    }
+    checkForRecovery()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-save to localStorage (debounced 1s)
@@ -230,32 +120,14 @@ export default function Editor() {
 
   useEffect(() => {
     if (debouncedMarkupForSave) {
-      saveSession(debouncedMarkupForSave, commentsRef.current)
+      saveSession(debouncedMarkupForSave)
     }
   }, [debouncedMarkupForSave]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handleResume = useCallback(() => {
-    if (recoverySession && editor) {
-      const { html, comments: savedComments } = criticMarkupToHTML(
-        recoverySession.markup
-      )
-      commentsRef.current = savedComments
-      setComments(savedComments)
-      editor.commands.setContent(html)
-    }
-    setShowRecovery(false)
-  }, [recoverySession, editor])
-
-  const handleStartFresh = useCallback(() => {
-    clearSession()
-    setShowRecovery(false)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Close mobile drawer on Escape
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && panelOpen) {
-        // Only close on mobile (< lg:). On desktop, Escape shouldn't close the inline panel.
         if (window.innerWidth < 1024) {
           setPanelOpen(false)
         }
@@ -268,11 +140,11 @@ export default function Editor() {
   const changesPanelElement = (
     <ChangesPanel
       changes={changes}
-      onScrollTo={handleScrollTo}
-      onCommentChange={handleCommentChange}
+      onScrollTo={scrollToChange}
+      onCommentChange={setComment}
       focusCommentId={focusCommentId}
-      onFocusHandled={handleFocusHandled}
-      onReturnToEditor={handleReturnToEditor}
+      onFocusHandled={clearFocusComment}
+      onReturnToEditor={returnToEditor}
       onClose={() => setPanelOpen(false)}
     />
   )
@@ -287,6 +159,8 @@ export default function Editor() {
           isPanelOpen={panelOpen}
           changeCount={changes.length}
           markup={rawMarkup}
+          trackingEnabled={trackingEnabled}
+          onTrackingToggle={toggleTracking}
         />
       </div>
 
@@ -333,7 +207,7 @@ export default function Editor() {
       <ImportModal
         isOpen={importOpen}
         onClose={() => setImportOpen(false)}
-        onImport={handleImport}
+        onImport={importDocument}
       />
 
       <AboutPanel
@@ -344,8 +218,8 @@ export default function Editor() {
       {showRecovery && recoverySession && (
         <RecoveryModal
           savedAt={recoverySession.savedAt}
-          onResume={handleResume}
-          onStartFresh={handleStartFresh}
+          onResume={resumeSession}
+          onStartFresh={startFresh}
         />
       )}
     </div>
