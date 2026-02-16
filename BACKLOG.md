@@ -102,6 +102,26 @@ Import a `.docx` file exported from Google Docs (with Suggesting mode edits) and
 - Lists: `word/numbering.xml` parsed to map `(numId, ilvl)` → `bullet`/`decimal`, emitted as `- ` or `1. ` prefixes.
 - Entries joined with `\n\n` (not `\n`) because `criticMarkupToHTML` splits blocks on double-newline.
 
+### Phase 8: Desktop App + Local File Editing
+Native macOS app via Tauri 2, with local file editing (Open/Save/SaveAs), track changes toggle, and Mac App Store distribution. Full spec: `docs/desktop-app.md`.
+
+**Prerequisites:** Safari browser testing to validate WKWebView compatibility before writing Tauri code.
+
+- [ ] **Phase A:** State management extraction — move comments, changes, markup, and document lifecycle out of Editor.tsx into a dedicated store. Abstract persistence interface (web: localStorage, desktop: Tauri fs). Web app behavior unchanged.
+- [ ] **Phase B:** Track changes toggle — `enabled` flag in TipTap extension storage, all three handlers check flag and passthrough when disabled. Toolbar toggle + Cmd+Shift+T shortcut. Ships on web too.
+- [ ] **Phase C:** Tauri shell — `src-tauri/` boilerplate, `tauri.conf.json` pointing at Vite, verify editor works in WKWebView. No native features yet — just the web app in a native window.
+- [ ] **Phase D:** Native file operations — Open/Save/SaveAs via `@tauri-apps/plugin-dialog` + `@tauri-apps/plugin-fs`. Native menu bar (File/Edit/View). Dirty state in title bar. File associations for `.md` and `.docx`. Cmd+S saves to disk.
+- [ ] **Phase E:** Mac App Store preparation — sandbox entitlements, universal binary, code signing, notarization, GitHub Actions CI for macOS build, DMG for direct distribution.
+- [ ] **Phase F:** Polish — Recent Files menu, Edit menu integration, window state persistence, auto-update via Tauri updater plugin.
+
+**Phase 8 design decisions:**
+- Tauri 2 chosen over Electron (3-8 MB binary vs 150-400 MB; WKWebView = no private API risk for MAS) and Swift+WKWebView (cross-platform > macOS-only).
+- Platform adapter pattern with runtime detection (`window.__TAURI__`), not build-time branching. `npm run dev` and `npm run build` never touch Tauri.
+- State extraction (Phase A) is the prerequisite refactor — avoids cementing Editor.tsx as a God component before adding file path, dirty state, and tracking toggle.
+- Track changes toggle (Phase B) lives in TipTap extension storage, not React state. Text typed with tracking off becomes indistinguishable from "original" text (intentional, matches Word/Google Docs behavior).
+- Save format is CriticMarkup with YAML frontmatter (same as current export). Round-trip safe.
+- **Known defect (accepted):** iOS virtual keyboard does not reliably fire `keydown` for Backspace/Delete. Deletion tracking may not work on iOS without a hardware keyboard. Mitigation: add `handleDOMEvents.beforeinput` handler when iOS target is actively developed. Does not affect macOS or web. See spec §8.1 for full analysis.
+
 ### Single-File Build + Release Process
 - [x] `vite-plugin-singlefile` integration — `npm run build:single` produces a single self-contained HTML file (`dist-single/index.html`) with all JS, CSS, and assets inlined
 - [x] Separate Vite config (`vite.config.singlefile.ts`) so normal GitHub Pages build is unaffected
@@ -168,6 +188,11 @@ Refinements that improve the feel but aren't blockers.
 
 ### Changes panel overflow (fixed)
 - [x] ~~Right-side changes/comment panel viewport area is not locked to the bottom of the screen — panel extends beyond viewport instead of scrolling internally~~ — fixed: switched from page-scrollable layout with `sticky` panel to viewport-locked flex layout (`h-dvh`). Editor and panel scroll independently within their columns.
+
+### iOS input handling (accepted defect — Phase 8)
+- [ ] `handleKeyDown` in TrackChanges plugin does not reliably fire on iOS virtual keyboard for Backspace/Delete. Deletion tracking may silently fail on iOS without a hardware keyboard. Text input and paste are unaffected. macOS and web are unaffected.
+- [ ] **Mitigation:** Add `handleDOMEvents.beforeinput` handler to catch `deleteContentBackward`/`deleteContentForward` input types. This is additive — does not modify existing `handleKeyDown` logic. Deferred until iOS target is actively developed.
+- [ ] Full analysis: `docs/desktop-app.md` §8.1
 
 ### Serialization edge cases
 - [ ] Substitution over text that already contains old deletions — old deletions emit as standalone `{--…--}` outside the `{~~…~~}`, which is semantically correct but may look odd
@@ -248,6 +273,9 @@ Refinements that improve the feel but aren't blockers.
 - [ ] Style rule extraction: analyze patterns across multiple CriticMarkup files to generate writing rules
 
 ### Platform Expansion
+- [ ] **macOS / Mac App Store** — Phase 8 (in progress, see above)
+- [ ] **iOS** — Tauri 2 supports iOS; requires resolving iOS input handling defect first (see Known Issues)
+- [ ] **Windows / Linux** — Tauri cross-platform via GitHub Actions CI (build on platform-specific runners)
 - [ ] Obsidian plugin (native integration into knowledge management ecosystem)
 - [ ] Export to Google Docs (CriticMarkup → `.docx` with Word track changes)
 - [ ] Diff fallback mode (alternative for users who prefer import-edit-diff workflow)
