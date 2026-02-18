@@ -10,7 +10,7 @@ Full specification lives in `docs/prd.md` and `docs/project-context.md`. Roadmap
 
 **Live:** https://markdown-feedback.com
 
-**Status:** Phase 8A+B COMPLETE (Zustand store extraction + track changes toggle). Phase 7E (DOCX polish) partial. Phase 9 (VSCode extension) planned — spec at `docs/vscode-extension.md`. See BACKLOG.md for details.
+**Status:** Phase 8C COMPLETE (platform adapter hardening). Phase 9 (VSCode extension) is next — spec at `docs/vscode-extension.md`. Phase 7E (DOCX polish) partial. See BACKLOG.md for details.
 
 ## Commands
 
@@ -61,7 +61,7 @@ This project uses an intercept-based architecture, NOT a diff-based approach. Ev
 - `src/utils/exportDocument.ts` — Export functions: `exportCriticMarkup()` (YAML frontmatter + markup), `exportClean()` (accept all changes), `exportOriginal()` (reject all changes), `countChanges()`, `downloadFile()`. Both clean and original exports strip `{==...==}` highlight markers.
 - `src/utils/extractChanges.ts` — Walks ProseMirror doc tree and extracts a structured `ChangeEntry[]` list with type (deletion/insertion/substitution/highlight), text, context snippets, positions, and optional comment text. Accepts a `comments` Record to merge into entries.
 - `src/stores/documentStore.ts` — Zustand store owning all document state (comments, changes, rawMarkup, trackingEnabled, focusCommentId, recovery state) and actions (handleEditorChange, importDocument, setComment, toggleTracking, etc.). Editor instance stored non-reactively. Persistence via `stores/persistence/` abstraction layer.
-- `src/stores/persistence/` — Platform-abstracted persistence (types.ts interface, web.ts localStorage adapter, index.ts factory). Future: Tauri fs adapter.
+- `src/stores/persistence/` — Platform-abstracted persistence. `types.ts` defines `PlatformAdapter` (session save/load/clear + optional file I/O + `capabilities` flags). `web.ts` — localStorage adapter; optional fields are no-ops. `index.ts` — factory with commented stubs for VSCode and Tauri detection. New adapters: `vscode.ts` (Phase 9A), `tauri.ts` (Phase 8D).
 - `src/components/Editor.tsx` — Thin layout shell consuming Zustand store. Owns UI-only toggles (sourceExpanded, importOpen, panelOpen, aboutOpen), TipTap `useEditor` setup, debounced values, auto-save effect, and DOM event listeners bridging plugin shortcuts to store actions.
 - `src/components/ChangesPanel.tsx` — Right sidebar listing all tracked changes and highlights in document order. Shows change type badge, context snippets with inline highlighting, click-to-scroll, and per-entry comment input (auto-save on blur, Tab/Enter to save and return to editor).
 - `src/utils/parseDocx.ts` — Entry point for .docx import. Takes an ArrayBuffer, extracts XML files via JSZip (dynamic import), parses with DOMParser, and calls `docxToMarkdown()`. Extracts `word/document.xml`, `word/comments.xml`, and `word/numbering.xml`.
@@ -162,11 +162,17 @@ docs/                      # Specification & design documents
   project-context.md       # Decision log & project context
   about-panel.md           # About panel content spec
   docx-import.md           # DOCX import architecture (Phase 7)
+  vscode-extension.md      # VSCode extension architecture (Phase 9)
 src/                       # Application source code
   components/              # React components
   extensions/              # TipTap/ProseMirror extensions
   hooks/                   # Custom React hooks
   utils/                   # Pure utility functions
+  stores/persistence/      # Platform adapter (web.ts, vscode.ts Phase 9A, tauri.ts Phase 8D)
+extension/                 # VSCode extension host (Phase 9A — not yet created)
+  package.json             # VS Code manifest (contributes.customEditors)
+  src/extension.ts         # Extension entry point
+  src/editorProvider.ts    # CustomTextEditorProvider
 .claude/commands/          # Custom slash commands
   release.md               # /release — changelog, tag, build, publish
 .github/workflows/         # CI/CD (GitHub Pages deployment)
@@ -209,6 +215,19 @@ When adding or changing user-facing keyboard shortcuts, features, or workflows, 
 
 Every URL written into README, docs, or code must be verified before committing. Run `gh api`, `curl`, or another check to confirm the resource exists. Never guess GitHub usernames — always check `git remote get-url origin`.
 
+## VSCode Extension (Phase 9)
+
+Full spec: `docs/vscode-extension.md`. Key points for implementation:
+
+- **Extension host** (`extension/src/`) — Node.js TypeScript. Registers `CustomTextEditorProvider` for `.md` with `priority: "option"`. Reads/writes VS Code `TextDocument`. Bridges file I/O to WebView via `postMessage`.
+- **WebView** — hosts existing Vite React bundle (`dist-vscode/`). Identical to web app; only the platform adapter changes.
+- **VSCode adapter** (`src/stores/persistence/vscode.ts`) — uses `acquireVsCodeApi()`. `load()` returns a Promise that resolves when `loadDocument` arrives from extension host. `save()` posts `documentChanged`. No localStorage used.
+- **Message protocol:** `ready` → `platformCapabilities` + `loadDocument` → `documentChanged` (debounced) ← `saveRequested`.
+- **File mode A (default):** `.md` file = CriticMarkup string. **File mode B (Phase 9B):** `.md` = clean markdown, `.criticmark` JSON sidecar = `{ markup, comments, savedAt }`.
+- **`retainContextWhenHidden: true`** — keep WebView alive when tab is hidden (TipTap is expensive to re-init).
+- **Keyboard conflict:** `Cmd+Shift+T` is intercepted by VS Code (reopen closed tab). Track changes toggle shortcut needs remapping for VSCode target — audit during 9A.
+- **Build:** `vite.config.vscode.ts` → `dist-vscode/` (base `'./'`). Extension host: esbuild → `extension/dist/`. Package: `vsce package` → `.vsix`.
+
 ## Relevant Skills for This Build
 
 - **ProseMirror internals** — marks, schema, transactions, plugins, step mapping
@@ -216,3 +235,4 @@ Every URL written into README, docs, or code must be verified before committing.
 - **DOM contentEditable behavior** — cursor positioning, selection ranges, `beforeinput` events
 - **CriticMarkup spec** — http://criticmarkup.com/spec.php
 - **Obsidian CriticMarkup plugin** — https://github.com/Fevol/obsidian-criticmarkup (compatibility target)
+- **VS Code extension API** — `CustomTextEditorProvider`, `WebviewPanel`, `TextDocument`, `WorkspaceEdit`, `postMessage`

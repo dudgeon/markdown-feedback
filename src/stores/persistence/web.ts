@@ -55,6 +55,7 @@ export function createWebPersistence(): PlatformAdapter {
     capabilities: {
       nativeFileIO: false,
       canOpenFile: false,
+      autoLoad: false,
     },
   }
 }

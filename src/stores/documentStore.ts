@@ -168,7 +168,13 @@ export const useDocumentStore = create<DocumentState & DocumentActions>(
     checkForRecovery: async () => {
       const saved = await persistence.load()
       if (saved) {
-        set({ recoverySession: saved, showRecovery: true })
+        if (persistence.capabilities.autoLoad) {
+          // Native targets (VSCode, Tauri): directly import the file content,
+          // skip the RecoveryModal (there is no "previous session" concept here)
+          get().importDocument(saved.markup)
+        } else {
+          set({ recoverySession: saved, showRecovery: true })
+        }
       }
     },
 

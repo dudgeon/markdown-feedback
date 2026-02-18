@@ -9,6 +9,12 @@ export interface PlatformCapabilities {
   nativeFileIO: boolean
   /** Has a native file-open dialog (Tauri only — VSCode opens files itself). */
   canOpenFile: boolean
+  /**
+   * When true, checkForRecovery() auto-imports the loaded document without
+   * showing the RecoveryModal. Used by native targets (VSCode, Tauri) where
+   * the "session" is always the open file, not a previous web session.
+   */
+  autoLoad: boolean
 }
 
 export interface PlatformAdapter {

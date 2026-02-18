@@ -8,7 +8,12 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "build:single": "tsc -b && vite build --config vite.config.singlefile.ts"
+    "build:single": "tsc -b && vite build --config vite.config.singlefile.ts",
+    "setup:vscode": "cd extension && npm install",
+    "build:vscode:webview": "tsc -b && vite build --config vite.config.vscode.ts",
+    "build:vscode:host": "esbuild extension/src/extension.ts --bundle --outfile=extension/dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap",
+    "build:vscode": "npm run build:vscode:webview && npm run build:vscode:host",
+    "package:vscode": "npm run build:vscode && cd extension && npx vsce package"
   },
   "dependencies": {
     "@tiptap/pm": "^3.19.0",
@@ -35,6 +40,7 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
     "vite": "^7.2.4",
-    "vite-plugin-singlefile": "^2.3.0"
+    "vite-plugin-singlefile": "^2.3.0",
+    "esbuild": "^0.25.0"
   }
 }

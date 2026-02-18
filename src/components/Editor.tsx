@@ -110,10 +110,24 @@ export default function Editor() {
     }
   }, [])
 
-  // Check for saved session on mount
+  // Check for saved session on mount (web) or load file content (VSCode/Tauri)
   useEffect(() => {
     checkForRecovery()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Handle 'saveRequested' from VS Code extension host (Cmd+S).
+  // Responds with an immediate (non-debounced) save so the extension host
+  // has the latest markup before VS Code writes the file to disk.
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if ((event.data as { type?: string })?.type === 'saveRequested') {
+        const { rawMarkup, saveSession } = useDocumentStore.getState()
+        saveSession(rawMarkup)
+      }
+    }
+    window.addEventListener('message', handleMessage)
+    return () => window.removeEventListener('message', handleMessage)
+  }, [])
 
   // Auto-save to localStorage (debounced 1s)
   const debouncedMarkupForSave = useDebouncedValue(rawMarkup, 1000)

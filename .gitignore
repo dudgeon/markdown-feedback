@@ -14,6 +14,12 @@ dist-ssr
 *.local
 .env
 
+# VSCode extension build artifacts
+extension/node_modules
+extension/dist
+extension/media
+*.vsix
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

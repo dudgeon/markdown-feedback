@@ -1,0 +1,54 @@
+{
+  "name": "markdown-feedback",
+  "displayName": "Markdown Feedback",
+  "description": "Track-changes editor for markdown. Every edit captured as CriticMarkup.",
+  "version": "0.1.0",
+  "publisher": "dudgeon",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dudgeon/markdown-feedback"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Editors"],
+  "keywords": ["markdown", "track changes", "criticmarkup", "diff"],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "customEditors": [
+      {
+        "viewType": "markdownFeedback.editor",
+        "displayName": "Markdown Feedback Editor",
+        "selector": [{ "filenamePattern": "*.md" }],
+        "priority": "option"
+      }
+    ],
+    "commands": [
+      {
+        "command": "markdownFeedback.openWith",
+        "title": "Markdown Feedback: Open with Track-Changes Editor"
+      }
+    ],
+    "configuration": {
+      "title": "Markdown Feedback",
+      "properties": {
+        "markdownFeedback.fileMode": {
+          "type": "string",
+          "enum": ["criticmarkup", "sidecar"],
+          "enumDescriptions": [
+            "Save tracked changes inline in the .md file as CriticMarkup notation (default). File remains valid markdown; tokens are visible in other editors.",
+            "Save clean markdown to .md; store tracked changes in a .criticmark sidecar file. The .md file renders cleanly everywhere; both files must travel together."
+          ],
+          "default": "criticmarkup",
+          "description": "How tracked changes are stored relative to the .md file on disk."
+        }
+      }
+    }
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.0.0"
+  }
+}
