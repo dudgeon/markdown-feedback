@@ -1,0 +1,21 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build:vscode:host",
+      "type": "shell",
+      // Only rebuilds the extension host (not the full WebView) for fast iteration.
+      // Run 'npm run build:vscode:webview' manually if you change the React app.
+      "command": "npm run build:vscode:host",
+      "problemMatcher": ["$esbuild-watch"],
+      "group": "build"
+    },
+    {
+      "label": "build:vscode (full)",
+      "type": "shell",
+      "command": "npm run build:vscode",
+      "problemMatcher": [],
+      "group": "build"
+    }
+  ]
+}

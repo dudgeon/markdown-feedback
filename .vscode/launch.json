@@ -1,0 +1,15 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run Extension",
+      "type": "extensionHost",
+      "request": "launch",
+      // Points to the extension/ subdirectory, not the repo root
+      "args": ["--extensionDevelopmentPath=${workspaceFolder}/extension"],
+      "preLaunchTask": "build:vscode:host",
+      "outFiles": ["${workspaceFolder}/extension/dist/**/*.js"],
+      "sourceMaps": true
+    }
+  ]
+}
