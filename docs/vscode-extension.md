@@ -1,9 +1,85 @@
-# Markdown Feedback — VSCode Extension Spec
+# Markdown Feedback — VSCode Extension
 
-**Status:** Planned (Phase 9)
-**Prerequisites:** Phase 8C (platform adapter hardening) complete
+**Status:** Phase 9A complete (scaffold + file mode A). Phase 9B (sidecar mode) planned.
 **Author:** Geoff + Claude
 **Date:** 2026-02-17
+
+---
+
+## 0. Setup & Testing
+
+> **Current state (Phase 9A):** Installation requires cloning the repo and running a few terminal commands. A zero-terminal path (VS Code Marketplace or pre-built `.vsix` release asset) is planned. These instructions will be updated as setup improves.
+
+### Developer testing (F5 in VS Code)
+
+Use this workflow when iterating on the extension itself.
+
+**Prerequisites:** Node 20+, VS Code
+
+```bash
+# 1. Install root dependencies (React app + build tools)
+npm install
+
+# 2. Install extension-specific dependencies (@types/vscode, vsce)
+npm run setup:vscode
+
+# 3. Build both the WebView bundle and the extension host
+npm run build:vscode
+```
+
+Then, with this repo open as your VS Code workspace:
+
+4. Press **F5** — VS Code opens a second window (the Extension Development Host) with the extension loaded
+5. In the new window, open any `.md` file
+6. Right-click the file's tab → **"Open With…"** → **"Markdown Feedback Editor"**
+7. The track-changes editor loads in place of the default text editor
+8. Make edits, press **Cmd+S** — the file on disk updates with CriticMarkup notation
+
+**Iterating on the extension host** (changes to `extension/src/`): press F5 again — the pre-launch task rebuilds the host in ~8ms before each launch.
+
+**Iterating on the React UI** (changes to `src/`): run `npm run build:vscode:webview` manually (~1–2s), then press F5.
+
+### User installation (.vsix)
+
+Use this to install the extension in your regular VS Code (not just the dev host).
+
+```bash
+npm install
+npm run setup:vscode
+npm run package:vscode    # produces extension/markdown-feedback-0.1.0.vsix
+```
+
+Then in VS Code: **Cmd+Shift+P** → "Extensions: Install from VSIX…" → select the `.vsix` file.
+
+After installation, the extension activates automatically. Open any `.md` file and choose "Open With → Markdown Feedback Editor" as described above.
+
+### First-time "Open With" experience
+
+VS Code's "Open With" prompt appears when you right-click the tab of an open file (or the file in the Explorer sidebar). The Markdown Feedback Editor will appear as an option because the extension registered as an `"option"` priority editor for `*.md` files — it does not hijack the default editor.
+
+To make Markdown Feedback the default for `.md` files in a specific project, add this to your workspace `.vscode/settings.json`:
+```json
+{
+  "workbench.editorAssociations": {
+    "*.md": "markdownFeedback.editor"
+  }
+}
+```
+
+### Known limitations (Phase 9A)
+
+- **Cmd+Shift+T conflict**: VS Code intercepts this shortcut (reopens a closed editor tab) before it reaches the WebView. The track-changes toggle (`Cmd+Shift+T` in the web app) does not work inside VS Code. Use the toolbar toggle pill instead. A remapped shortcut is planned.
+- **"Open With" is not automatic**: VS Code does not prompt on first `.md` open — you must right-click. Making Markdown Feedback the default requires the workspace setting above.
+- **Requires building from source**: No Marketplace listing yet. See planned improvements below.
+
+### Planned improvements
+
+| Improvement | Phase |
+|---|---|
+| Pre-built `.vsix` attached to GitHub releases (no terminal needed) | Before Marketplace |
+| VS Code Marketplace listing (one-click install from Extensions panel) | Post-9B |
+| Remap `Cmd+Shift+T` to a VS Code-safe shortcut | 9A polish |
+| Sidecar file mode (clean `.md` + `.criticmark` alongside) | 9B |
 
 ---
 

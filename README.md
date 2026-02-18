@@ -8,7 +8,7 @@ Built for the workflow: LLM generates draft → human edits with track changes �
 
 ## Status
 
-**Phase 7 in progress** (DOCX import from Google Docs — Phases A–D complete). See [BACKLOG.md](BACKLOG.md) for the full roadmap.
+**Phase 9A complete** — VSCode extension scaffold (custom editor, file mode A). Phase 9B (sidecar mode) next. See [BACKLOG.md](BACKLOG.md) for the full roadmap.
 
 ## How It Works
 
@@ -58,6 +58,24 @@ Markdown Feedback is a **fully client-side application**. There is no server, no
 - **Fully auditable.** The file is ~730 KB of minified JavaScript and CSS. The source code is MIT-licensed and available in this repository.
 
 This means it's safe to use on corporate networks, behind firewalls, or in environments with strict data handling policies — your content stays on your machine.
+
+## VS Code Extension (Beta)
+
+Edit `.md` files with track changes directly inside VS Code — no browser required.
+
+The extension registers a custom editor for `.md` files. Every edit is captured as CriticMarkup inline in the file. Cmd+S saves tracked changes back to disk.
+
+**Current installation** requires building from source (Marketplace listing planned):
+
+```bash
+npm install && npm run setup:vscode && npm run build:vscode
+```
+
+Then press **F5** in VS Code to open the Extension Development Host, or run `npm run package:vscode` to produce an installable `.vsix`.
+
+To use the editor: open a `.md` file → right-click the tab → **"Open With…"** → **"Markdown Feedback Editor"**.
+
+Full setup instructions, keyboard limitations, and planned improvements: [docs/vscode-extension.md](docs/vscode-extension.md#0-setup--testing)
 
 ## Quick Start (Development)
 
