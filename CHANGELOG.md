@@ -1,5 +1,13 @@
 # Changelog
 
+## [v1.1.1] — 2026-02-18
+
+### Fixes
+
+- DOCX import: change count in the preview modal now reflects actual CriticMarkup tokens emitted, fixing a false "no tracked changes found" message
+- DOCX import: author attribution surfaced from `w:author` on `<w:ins>`/`<w:del>` elements; each tracked change gets a `[from: Author]` prefix in its comment token
+- Changes panel: author badge displayed as non-editable label; comment textarea shows only the user-editable note portion
+
 ## [v1.1.0] — 2026-02-18
 
 ### Features
