@@ -35,7 +35,7 @@ export default function Editor() {
   // UI-only local state
   const [sourceExpanded, setSourceExpanded] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
-  const [panelOpen, setPanelOpen] = useState(true)
+  const [panelOpen, setPanelOpen] = useState(() => window.innerWidth >= 1024)
   const [aboutOpen, setAboutOpen] = useState(false)
 
   // Store state
