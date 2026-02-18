@@ -10,7 +10,7 @@ Full specification lives in `docs/prd.md` and `docs/project-context.md`. Roadmap
 
 **Live:** https://markdown-feedback.com
 
-**Status:** Phase 8A+B COMPLETE (Zustand store extraction + track changes toggle). Phase 7E (DOCX polish) partial. See BACKLOG.md for details.
+**Status:** Phase 8A+B COMPLETE (Zustand store extraction + track changes toggle). Phase 7E (DOCX polish) partial. Phase 9 (VSCode extension) planned — spec at `docs/vscode-extension.md`. See BACKLOG.md for details.
 
 ## Commands
 

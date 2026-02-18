@@ -102,25 +102,44 @@ Import a `.docx` file exported from Google Docs (with Suggesting mode edits) and
 - Lists: `word/numbering.xml` parsed to map `(numId, ilvl)` → `bullet`/`decimal`, emitted as `- ` or `1. ` prefixes.
 - Entries joined with `\n\n` (not `\n`) because `criticMarkupToHTML` splits blocks on double-newline.
 
-### Phase 8: Desktop App + Local File Editing
-Native macOS app via Tauri 2, with local file editing (Open/Save/SaveAs), track changes toggle, and Mac App Store distribution. Full spec: `docs/desktop-app.md`.
+### Phase 8: Multi-Platform Foundation + macOS App
+Platform adapter hardening, then native macOS app via Tauri 2. Full spec: `docs/desktop-app.md`.
 
-**Prerequisites:** Safari browser testing to validate WKWebView compatibility before writing Tauri code.
+**Execution order note:** Phase 8C (adapter hardening) is a prerequisite for all native targets. Phase 9 (VSCode extension) is built before Phase 8D–G (Tauri) because: VSCode requires no native toolchain, uses Chromium (same engine as web app), and validates the platform adapter pattern before tackling WKWebView compatibility. See Phase 9 below.
 
 - [x] **Phase A:** State management extraction — moved document state from Editor.tsx into Zustand store (`documentStore.ts`). Abstract persistence layer (`stores/persistence/`). Web app behavior unchanged.
 - [x] **Phase B:** Track changes toggle — module-level `_trackingEnabled` flag, all three handlers check flag and passthrough when disabled. Toolbar toggle pill + Cmd+Shift+T shortcut. `appendTransaction` strips inclusive insertion marks from untracked text. Keyboard shortcuts section added to About panel. Ships on web.
-- [ ] **Phase C:** Tauri shell — `src-tauri/` boilerplate, `tauri.conf.json` pointing at Vite, verify editor works in WKWebView. No native features yet — just the web app in a native window.
-- [ ] **Phase D:** Native file operations — Open/Save/SaveAs via `@tauri-apps/plugin-dialog` + `@tauri-apps/plugin-fs`. Native menu bar (File/Edit/View). Dirty state in title bar. File associations for `.md` and `.docx`. Cmd+S saves to disk.
-- [ ] **Phase E:** Mac App Store preparation — sandbox entitlements, universal binary, code signing, notarization, GitHub Actions CI for macOS build, DMG for direct distribution.
-- [ ] **Phase F:** Polish — Recent Files menu, Edit menu integration, window state persistence, auto-update via Tauri updater plugin.
+- [x] **Phase C:** Platform adapter hardening — expand `PlatformAdapter` interface beyond persistence to cover file I/O (`openFile`, `saveFile`, `getCurrentFilePath`), platform signals (`setDirty`, `onExternalFileChange`), and a `capabilities` flag object for conditional UI. Web adapter satisfies all optional fields with no-ops. No user-visible change — prerequisite refactor for all native targets. *(Do before Phase 9 VSCode and before Phase 8D Tauri.)*
+- [ ] **Phase D:** Tauri shell — `src-tauri/` boilerplate, `tauri.conf.json` pointing at Vite, verify editor works in WKWebView. No native features yet — just the web app in a native window. *(Do after Phase 9A VSCode — VSCode validates the app works in a non-browser WebView first.)*
+- [ ] **Phase E:** Native file operations — Open/Save/SaveAs via `@tauri-apps/plugin-dialog` + `@tauri-apps/plugin-fs`. Native menu bar (File/Edit/View). Dirty state in title bar. File associations for `.md` and `.docx`. Cmd+S saves to disk.
+- [ ] **Phase F:** Mac App Store preparation — sandbox entitlements, universal binary, code signing, notarization, GitHub Actions CI for macOS build, DMG for direct distribution. *(Requires Apple Developer Program membership.)*
+- [ ] **Phase G:** Polish — Recent Files menu, Edit menu integration, window state persistence, auto-update via Tauri updater plugin.
 
 **Phase 8 design decisions:**
 - Tauri 2 chosen over Electron (3-8 MB binary vs 150-400 MB; WKWebView = no private API risk for MAS) and Swift+WKWebView (cross-platform > macOS-only).
-- Platform adapter pattern with runtime detection (`window.__TAURI__`), not build-time branching. `npm run dev` and `npm run build` never touch Tauri.
+- Platform adapter pattern with runtime detection (`window.__TAURI__` / `acquireVsCodeApi`), not build-time branching. `npm run dev` and `npm run build` never touch native targets.
 - State extraction (Phase A) is the prerequisite refactor — avoids cementing Editor.tsx as a God component before adding file path, dirty state, and tracking toggle.
 - Track changes toggle (Phase B) uses a module-level variable in `trackChanges.ts` (not TipTap extension storage, which resets on `useEditor` re-render). Text typed with tracking off becomes indistinguishable from "original" text (intentional, matches Word/Google Docs behavior).
 - Save format is CriticMarkup with YAML frontmatter (same as current export). Round-trip safe.
 - **Known defect (accepted):** iOS virtual keyboard does not reliably fire `keydown` for Backspace/Delete. Deletion tracking may not work on iOS without a hardware keyboard. Mitigation: add `handleDOMEvents.beforeinput` handler when iOS target is actively developed. Does not affect macOS or web. See spec §8.1 for full analysis.
+
+---
+
+### Phase 9: VSCode Extension
+Custom Text Editor for `.md` files. Hosts the existing React/TipTap app in a VS Code WebView. Full spec: `docs/vscode-extension.md`.
+
+**Why before Tauri (8D–G):** No native toolchain required (Node/TypeScript only). Uses Electron/Chromium — same engine as the web app, no WKWebView compatibility risk. VS Code Marketplace distribution is simpler than Mac App Store. Validates the platform adapter pattern (Phase 8C) as its first real consumer before Tauri is built against it.
+
+- [ ] **Phase A:** Custom Editor (file mode A, CriticMarkup as file) — VS Code extension scaffold (`package.json` manifest, `extension.ts`), `CustomTextEditorProvider` for `.md` files, WebView hosting existing Vite React bundle, `postMessage` protocol (`ready` / `loadDocument` / `documentChanged` / `saveRequested`), Cmd+S integration via VS Code TextDocument API, VSCode platform adapter (replaces localStorage, routes file I/O through extension host). Build pipeline: extension host via esbuild + WebView via existing Vite build.
+- [ ] **Phase B:** File mode toggle (Option B, sidecar) — VS Code workspace setting `markdownFeedback.fileMode: "criticmarkup" | "sidecar"`. In sidecar mode: `.md` file holds clean markdown (accept-all export), `.criticmark` JSON sidecar holds `{ markup, comments, savedAt }`. On open: read both files, reconstruct full session in WebView. On save: write clean markdown to `.md`, write sidecar JSON to `.criticmark`. Status bar indicator showing active file mode.
+
+**Phase 9 design decisions:**
+- `CustomTextEditorProvider` (not `CustomReadonlyEditorProvider`) — VS Code owns the document model, so dirty state, Cmd+S, and undo stack integration are free.
+- Editor priority: `"option"` — do not replace the default markdown editor. User right-clicks → "Open With → Markdown Feedback Editor", or sets as default per-workspace via `workbench.editorAssociations`.
+- WebView is stateless between sessions — content always comes from the file (not localStorage). The VSCode adapter's `load()` is a no-op; content arrives via `loadDocument` message on WebView ready.
+- Sidecar filename: `{basename}.criticmark` alongside the `.md` file. Format matches the current localStorage payload for consistency.
+- File mode A is the correct default — CriticMarkup degrades gracefully in any markdown viewer, is Obsidian-compatible, and round-trips perfectly. Mode B is opt-in for workflows where non-tool users view the same files.
+- Single source tree — no fork. The extension packages the same Vite bundle as the web app; the platform adapter is the only new code.
 
 ### Single-File Build + Release Process
 - [x] `vite-plugin-singlefile` integration — `npm run build:single` produces a single self-contained HTML file (`dist-single/index.html`) with all JS, CSS, and assets inlined
@@ -273,9 +292,11 @@ Refinements that improve the feel but aren't blockers.
 - [ ] Style rule extraction: analyze patterns across multiple CriticMarkup files to generate writing rules
 
 ### Platform Expansion
-- [ ] **macOS / Mac App Store** — Phase 8 (in progress, see above)
-- [ ] **iOS** — Tauri 2 supports iOS; requires resolving iOS input handling defect first (see Known Issues)
-- [ ] **Windows / Linux** — Tauri cross-platform via GitHub Actions CI (build on platform-specific runners)
+- [ ] **VSCode extension** — Phase 9 (see above; builds before Tauri)
+- [ ] **macOS / Mac App Store** — Phase 8D–G (see above; after VSCode)
+- [ ] **Android** — Tauri 2 supports Android; same `beforeinput` fix required as iOS; lower priority
+- [ ] **iOS** — Tauri 2 supports iOS; requires resolving iOS input handling defect first (see Known Issues); currently infeasible due to virtual keyboard `keydown` unreliability
+- [ ] **Windows / Linux** — Tauri cross-platform via GitHub Actions CI; non-priority
 - [ ] Obsidian plugin (native integration into knowledge management ecosystem)
 - [ ] Export to Google Docs (CriticMarkup → `.docx` with Word track changes)
 - [ ] Diff fallback mode (alternative for users who prefer import-edit-diff workflow)

@@ -1,8 +1,8 @@
-import type { PersistenceAdapter, SavedSession } from './types'
+import type { PlatformAdapter, SavedSession } from './types'
 
 const STORAGE_KEY = 'markdown-feedback-session'
 
-export function createWebPersistence(): PersistenceAdapter {
+export function createWebPersistence(): PlatformAdapter {
   return {
     async save(markup: string, comments: Record<string, string>) {
       try {
@@ -41,6 +41,20 @@ export function createWebPersistence(): PersistenceAdapter {
       } catch {
         // Ignore
       }
+    },
+
+    // File I/O — not available on web; use the Export menu instead
+    openFile: undefined,
+    saveFile: undefined,
+    getCurrentFilePath: undefined,
+
+    // Platform signals — not applicable on web
+    setDirty: undefined,
+    onExternalFileChange: undefined,
+
+    capabilities: {
+      nativeFileIO: false,
+      canOpenFile: false,
     },
   }
 }
