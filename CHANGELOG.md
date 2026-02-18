@@ -1,5 +1,24 @@
 # Changelog
 
+## [v1.1.0] — 2026-02-18
+
+### Features
+
+- Zustand store extraction: all document state centralized in `documentStore.ts` (97416f7)
+- Track changes toggle (Cmd+Shift+T) — pause recording without leaving the editor (97416f7)
+- Platform adapter hardening: web/VSCode/Tauri adapters behind a clean `PlatformAdapter` interface (e16238f)
+- VSCode Custom Editor extension scaffold: open `.md` files inside VS Code with the full editor UI (679fccf)
+- Hide changes panel by default on small viewports for better mobile experience (a03ff3e)
+
+### Infrastructure
+
+- VS Code extension dev launch config (`.vscode/launch.json`) (5160052)
+- VSCode extension setup docs added to README and spec (9806458)
+- Phase 9A marked complete in backlog; extension package-lock added (fdabbd5)
+- Desktop app spec and Phase 8 roadmap added to docs (b2b2944)
+- Repo layout, release process, and URL verification rules documented in CLAUDE.md (ecd4377)
+- README updated with download link pointing to v1.0.0 release (b52e7ff)
+
 ## [v1.0.0] — 2026-02-12
 
 First release. A fully client-side track-changes editor for markdown, with CriticMarkup output.
