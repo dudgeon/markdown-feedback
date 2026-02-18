@@ -1,5 +1,11 @@
 # Changelog
 
+## [v1.1.3] — 2026-02-18
+
+### Fixes
+
+- DOCX import: tables are now converted to GFM markdown tables; first row treated as header, tracked changes inside cells preserved as CriticMarkup tokens
+
 ## [v1.1.2] — 2026-02-18
 
 ### Fixes

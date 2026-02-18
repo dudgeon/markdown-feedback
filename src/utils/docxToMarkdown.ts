@@ -510,6 +510,66 @@ function prepassCommentRanges(paragraph: Element, ctx: WalkContext): void {
   }
 }
 
+// ── Table Walker ─────────────────────────────────────────────────────────────
+
+/**
+ * Walk a <w:tbl> element and emit a GFM markdown table.
+ *
+ * The first row becomes the header. Tracked changes inside cells are preserved
+ * as CriticMarkup tokens. Multiple paragraphs within a cell are joined with a
+ * space. Pipe characters in cell content are escaped.
+ */
+function walkTable(tbl: Element, ctx: WalkContext): string {
+  const rows = wChildren(tbl, 'tr')
+  if (rows.length === 0) return ''
+
+  const tableRows: string[][] = []
+
+  for (const row of rows) {
+    const cells = wChildren(row, 'tc')
+    const cellContents: string[] = []
+
+    for (const cell of cells) {
+      const paragraphs = wChildren(cell, 'p')
+      const cellParts: string[] = []
+
+      for (const para of paragraphs) {
+        ctx.openCommentRanges.clear()
+        ctx.commentPlainText.clear()
+        const content = walkParagraph(para, ctx)
+        if (content.trim()) cellParts.push(content.trim())
+      }
+
+      // Escape pipe characters so they don't break the table syntax
+      const cellText = cellParts.join(' ').replace(/\|/g, '\\|')
+      cellContents.push(cellText)
+    }
+
+    tableRows.push(cellContents)
+  }
+
+  if (tableRows.length === 0) return ''
+
+  const colCount = Math.max(...tableRows.map((r) => r.length))
+
+  // Pad each row to colCount columns
+  const pad = (row: string[]) =>
+    row.concat(Array(Math.max(0, colCount - row.length)).fill(''))
+
+  const lines: string[] = []
+
+  // Header (first row)
+  lines.push('| ' + pad(tableRows[0]).join(' | ') + ' |')
+  // Separator
+  lines.push('| ' + Array(colCount).fill('---').join(' | ') + ' |')
+  // Data rows
+  for (let i = 1; i < tableRows.length; i++) {
+    lines.push('| ' + pad(tableRows[i]).join(' | ') + ' |')
+  }
+
+  return lines.join('\n')
+}
+
 // ── Main Entry ───────────────────────────────────────────────────────────────
 
 export function docxToMarkdown(
@@ -576,8 +636,11 @@ export function docxToMarkdown(
       if (content || prefix) {
         entries.push(prefix + content)
       }
+    } else if (child.localName === 'tbl') {
+      const tableMarkdown = walkTable(child, ctx)
+      if (tableMarkdown) entries.push(tableMarkdown)
     }
-    // Skip <w:tbl> (tables), <w:sectPr> (section properties), etc.
+    // Skip <w:sectPr> (section properties) and other unsupported elements.
   }
 
   // Join all entries with \n\n (criticMarkupToHTML splits on blank lines).
