@@ -86,25 +86,49 @@ function applyFormatting(run: Element, text: string): string {
 
 // ── Comment Map Builder ──────────────────────────────────────────────────────
 
-function buildCommentMap(commentsXml: Document | null): Map<string, string> {
+/**
+ * Build a map of comment ID → comment text.
+ *
+ * - Each comment is prefixed with its author: "Author: text"
+ * - Comments whose IDs are NOT in referencedIds have no anchor in the document
+ *   body and are likely replies. They are appended to the most recent referenced
+ *   comment using a newline separator so the full thread is preserved.
+ */
+function buildCommentMap(
+  commentsXml: Document | null,
+  referencedIds: Set<string>
+): Map<string, string> {
   const map = new Map<string, string>()
   if (!commentsXml) return map
 
-  // Find <w:comment> elements
   const comments = commentsXml.getElementsByTagName('w:comment')
+  let lastReferencedId: string | null = null
+
   for (let i = 0; i < comments.length; i++) {
     const comment = comments[i]
     const id = wAttr(comment, 'id')
     if (!id) continue
 
+    const author = wAttr(comment, 'author')
+
     // Concatenate all <w:t> text within the comment (may span paragraphs)
     let text = ''
     const tNodes = comment.getElementsByTagName('w:t')
     for (let j = 0; j < tNodes.length; j++) {
-      if (j > 0) text += ' ' // Space between paragraphs
+      if (j > 0) text += ' '
       text += tNodes[j].textContent ?? ''
     }
-    if (text) map.set(id, text)
+    if (!text) continue
+
+    const entry = author ? `${author}: ${text}` : text
+
+    if (referencedIds.has(id)) {
+      map.set(id, entry)
+      lastReferencedId = id
+    } else if (lastReferencedId) {
+      // Reply — append to the parent comment thread
+      map.set(lastReferencedId, `${map.get(lastReferencedId)!}\n${entry}`)
+    }
   }
   return map
 }
@@ -304,9 +328,9 @@ function walkParagraph(paragraph: Element, ctx: WalkContext): string {
             break
           }
         }
-        // Emit any comment references nested inside either element
+        // Emit author attribution and any comment references nested inside either element
         const refs = [...collectCommentRefsInside(child, ctx), ...collectCommentRefsInside(nextSibling, ctx)]
-        emitCommentRefs(parts, refs, ctx)
+        emitChangeAttribution(parts, refs, wAttr(child, 'author'), ctx)
         for (const commentId of ctx.openCommentRanges) {
           ctx.commentOnChange.set(commentId, true)
         }
@@ -315,7 +339,7 @@ function walkParagraph(paragraph: Element, ctx: WalkContext): string {
         if (delText) {
           parts.push(`{--${delText}--}`)
           ctx.changeCount++
-          emitCommentRefs(parts, collectCommentRefsInside(child, ctx), ctx)
+          emitChangeAttribution(parts, collectCommentRefsInside(child, ctx), wAttr(child, 'author'), ctx)
           for (const commentId of ctx.openCommentRanges) {
             ctx.commentOnChange.set(commentId, true)
           }
@@ -338,9 +362,9 @@ function walkParagraph(paragraph: Element, ctx: WalkContext): string {
             break
           }
         }
-        // Emit any comment references nested inside either element
+        // Emit author attribution and any comment references nested inside either element
         const refs = [...collectCommentRefsInside(child, ctx), ...collectCommentRefsInside(nextSibling, ctx)]
-        emitCommentRefs(parts, refs, ctx)
+        emitChangeAttribution(parts, refs, wAttr(child, 'author'), ctx)
         for (const commentId of ctx.openCommentRanges) {
           ctx.commentOnChange.set(commentId, true)
         }
@@ -349,7 +373,7 @@ function walkParagraph(paragraph: Element, ctx: WalkContext): string {
         if (insText) {
           parts.push(`{++${insText}++}`)
           ctx.changeCount++
-          emitCommentRefs(parts, collectCommentRefsInside(child, ctx), ctx)
+          emitChangeAttribution(parts, collectCommentRefsInside(child, ctx), wAttr(child, 'author'), ctx)
           for (const commentId of ctx.openCommentRanges) {
             ctx.commentOnChange.set(commentId, true)
           }
@@ -415,11 +439,30 @@ function collectCommentRefsInside(el: Element, ctx: WalkContext): string[] {
   return refs
 }
 
-/** Emit comment references found inside tracked change elements. */
-function emitCommentRefs(parts: string[], refs: string[], ctx: WalkContext): void {
-  for (const id of refs) {
-    parts.push(`{>>${ctx.commentMap.get(id)!}<<}`)
-    ctx.commentCount++
+/**
+ * Emit attribution and comment references after a tracked change.
+ *
+ * If there are comment refs, emit them (author is already embedded in the
+ * comment text by buildCommentMap). If there are no comments but the tracked
+ * change has a w:author, emit a bare attribution token so the reviewer knows
+ * who made the edit.
+ */
+function emitChangeAttribution(
+  parts: string[],
+  refs: string[],
+  author: string | null,
+  ctx: WalkContext
+): void {
+  if (refs.length === 0) {
+    if (author) {
+      parts.push(`{>>${author}<<}`)
+      ctx.commentCount++
+    }
+  } else {
+    for (const id of refs) {
+      parts.push(`{>>${ctx.commentMap.get(id)!}<<}`)
+      ctx.commentCount++
+    }
   }
 }
 
@@ -474,7 +517,16 @@ export function docxToMarkdown(
   commentsXml: Document | null,
   numberingXml: Document | null = null
 ): { markup: string; changeCount: number; commentCount: number } {
-  const commentMap = buildCommentMap(commentsXml)
+  // Pre-pass: collect comment reference IDs so buildCommentMap can distinguish
+  // main comments (anchored in the document) from replies (no anchor).
+  const referencedCommentIds = new Set<string>()
+  const commentRefEls = documentXml.getElementsByTagName('w:commentReference')
+  for (let i = 0; i < commentRefEls.length; i++) {
+    const id = wAttr(commentRefEls[i], 'id')
+    if (id) referencedCommentIds.add(id)
+  }
+
+  const commentMap = buildCommentMap(commentsXml, referencedCommentIds)
   const numberingMap = buildNumberingMap(numberingXml)
 
   const ctx: WalkContext = {

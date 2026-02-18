@@ -1,5 +1,13 @@
 # Changelog
 
+## [v1.1.2] — 2026-02-18
+
+### Fixes
+
+- DOCX import: author name now appears in comment text as `Author: note` (plain text, no special badge)
+- DOCX import: comment replies (threads) are now concatenated under the main comment so the full thread is visible
+- DOCX import: pre-pass collects referenced comment IDs to reliably distinguish main comments from replies
+
 ## [v1.1.1] — 2026-02-18
 
 ### Fixes
