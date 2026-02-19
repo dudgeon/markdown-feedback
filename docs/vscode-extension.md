@@ -8,7 +8,7 @@
 
 ## 0. Setup & Testing
 
-> **Current state (Phase 9A):** Installation requires cloning the repo and running a few terminal commands. A zero-terminal path (VS Code Marketplace or pre-built `.vsix` release asset) is planned. These instructions will be updated as setup improves.
+> **Current state (Phase 9A+B):** Installation requires cloning the repo and running a few terminal commands. A zero-terminal path (VS Code Marketplace or pre-built `.vsix` release asset) is planned. These instructions will be updated as setup improves.
 
 ### Developer testing (F5 in VS Code)
 
@@ -66,7 +66,7 @@ To make Markdown Feedback the default for `.md` files in a specific project, add
 }
 ```
 
-### Known limitations (Phase 9A)
+### Known limitations
 
 - **Cmd+Shift+T conflict**: VS Code intercepts this shortcut (reopens a closed editor tab) before it reaches the WebView. The track-changes toggle (`Cmd+Shift+T` in the web app) does not work inside VS Code. Use the toolbar toggle pill instead. A remapped shortcut is planned.
 - **"Open With" is not automatic**: VS Code does not prompt on first `.md` open — you must right-click. Making Markdown Feedback the default requires the workspace setting above.
@@ -77,7 +77,7 @@ To make Markdown Feedback the default for `.md` files in a specific project, add
 | Improvement | Phase |
 |---|---|
 | Pre-built `.vsix` attached to GitHub releases (no terminal needed) | Next |
-| VS Code Marketplace listing (one-click install from Extensions panel) | Post-9B |
+| VS Code Marketplace listing (one-click install from Extensions panel) | Planned |
 | Remap `Cmd+Shift+T` to a VS Code-safe shortcut | Polish |
 | Sidecar file mode (clean `.md` + `.criticmark` alongside) | ✓ Done (9B) |
 
