@@ -1,5 +1,19 @@
 # Changelog
 
+## [v1.2.0] — 2026-02-19
+
+### Features
+
+- VSCode extension sidecar file mode: `.md` holds clean markdown, `.criticmark` sidecar holds tracked changes + comments. Set via `markdownFeedback.fileMode: "sidecar"` in workspace settings.
+- Status bar indicator showing active file mode (`MF: CriticMarkup` / `MF: Sidecar`) whenever a Markdown Feedback editor is open
+- Mode-switch UX: switching sidecar → CriticMarkup prompts to delete the sidecar; switching CriticMarkup → sidecar shows an info toast
+- MIT LICENSE file added to repo
+
+### Infrastructure
+
+- VSCode extension now packaged as `.vsix` and attached to releases — install without cloning
+- `extension/src/sidecarManager.ts`: sidecar read/write/delete + `acceptAllChanges()` string transformer
+
 ## [v1.1.3] — 2026-02-18
 
 ### Fixes

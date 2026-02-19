@@ -63,19 +63,30 @@ This means it's safe to use on corporate networks, behind firewalls, or in envir
 
 Edit `.md` files with track changes directly inside VS Code — no browser required.
 
-The extension registers a custom editor for `.md` files. Every edit is captured as CriticMarkup inline in the file. Cmd+S saves tracked changes back to disk.
+### Install
 
-**Current installation** requires building from source (Marketplace listing planned):
+1. Download `markdown-feedback-0.1.0.vsix` from the [latest release](https://github.com/dudgeon/markdown-feedback/releases/latest)
+2. In VS Code: open the Command Palette (**Cmd+Shift+P**) → type **"Install from VSIX"** → select the downloaded file
+3. Restart VS Code if prompted
 
-```bash
-npm install && npm run setup:vscode && npm run build:vscode
+### Use
+
+1. Open any `.md` file in VS Code
+2. Right-click the file's tab → **"Open With…"** → **"Markdown Feedback Editor"**
+3. Start editing — every change is automatically tracked
+4. **Cmd+S** saves your tracked changes back to the file
+
+That's it. To make Markdown Feedback the default editor for `.md` files in a project, add this to your workspace `.vscode/settings.json`:
+
+```json
+{
+  "workbench.editorAssociations": {
+    "*.md": "markdownFeedback.editor"
+  }
+}
 ```
 
-Then press **F5** in VS Code to open the Extension Development Host, or run `npm run package:vscode` to produce an installable `.vsix`.
-
-To use the editor: open a `.md` file → right-click the tab → **"Open With…"** → **"Markdown Feedback Editor"**.
-
-Full setup instructions, keyboard limitations, and planned improvements: [docs/vscode-extension.md](docs/vscode-extension.md#0-setup--testing)
+Full setup instructions, file mode options, and known limitations: [docs/vscode-extension.md](docs/vscode-extension.md#0-setup--testing)
 
 ## Quick Start (Development)
 

@@ -70,7 +70,7 @@ To make Markdown Feedback the default for `.md` files in a specific project, add
 
 - **Cmd+Shift+T conflict**: VS Code intercepts this shortcut (reopens a closed editor tab) before it reaches the WebView. The track-changes toggle (`Cmd+Shift+T` in the web app) does not work inside VS Code. Use the toolbar toggle pill instead. A remapped shortcut is planned.
 - **"Open With" is not automatic**: VS Code does not prompt on first `.md` open — you must right-click. Making Markdown Feedback the default requires the workspace setting above.
-- **Requires building from source**: No Marketplace listing yet. See planned improvements below.
+- **No Marketplace listing yet**: Install by downloading the `.vsix` from the [latest release](https://github.com/dudgeon/markdown-feedback/releases/latest) and using "Install from VSIX" in VS Code. Marketplace listing is planned.
 
 ### Planned improvements
 
