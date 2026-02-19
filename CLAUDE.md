@@ -10,7 +10,7 @@ Full specification lives in `docs/prd.md` and `docs/project-context.md`. Roadmap
 
 **Live:** https://markdown-feedback.com
 
-**Status:** Phase 8C COMPLETE (platform adapter hardening). Phase 9 (VSCode extension) is next — spec at `docs/vscode-extension.md`. Phase 7E (DOCX polish) partial. See BACKLOG.md for details.
+**Status:** Phase 9A+B COMPLETE (VSCode extension — CriticMarkup inline + sidecar modes). Next: Phase 8D (Tauri macOS shell). Phase 7E (DOCX polish) partial. See BACKLOG.md for details.
 
 ## Commands
 

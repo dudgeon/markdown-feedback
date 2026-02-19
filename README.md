@@ -8,7 +8,7 @@ Built for the workflow: LLM generates draft → human edits with track changes �
 
 ## Status
 
-**Phase 9A complete** — VSCode extension scaffold (custom editor, file mode A). Phase 9B (sidecar mode) next. See [BACKLOG.md](BACKLOG.md) for the full roadmap.
+**Phase 9A+B complete** — VSCode extension with CriticMarkup inline mode and sidecar mode. Next: Tauri macOS app (Phase 8D). See [BACKLOG.md](BACKLOG.md) for the full roadmap.
 
 ## How It Works
 

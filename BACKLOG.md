@@ -130,8 +130,10 @@ Custom Text Editor for `.md` files. Hosts the existing React/TipTap app in a VS 
 
 **Why before Tauri (8D–G):** No native toolchain required (Node/TypeScript only). Uses Electron/Chromium — same engine as the web app, no WKWebView compatibility risk. VS Code Marketplace distribution is simpler than Mac App Store. Validates the platform adapter pattern (Phase 8C) as its first real consumer before Tauri is built against it.
 
+**Phase 9A+B complete.** Next: pre-built `.vsix` release asset, then Marketplace listing.
+
 - [x] **Phase A:** Custom Editor (file mode A, CriticMarkup as file) — VS Code extension scaffold (`package.json` manifest, `extension.ts`), `CustomTextEditorProvider` for `.md` files, WebView hosting existing Vite React bundle, `postMessage` protocol (`ready` / `loadDocument` / `documentChanged` / `saveRequested`), Cmd+S integration via VS Code TextDocument API, VSCode platform adapter (replaces localStorage, routes file I/O through extension host). Build pipeline: extension host via esbuild + WebView via existing Vite build.
-- [ ] **Phase B:** File mode toggle (Option B, sidecar) — VS Code workspace setting `markdownFeedback.fileMode: "criticmarkup" | "sidecar"`. In sidecar mode: `.md` file holds clean markdown (accept-all export), `.criticmark` JSON sidecar holds `{ markup, comments, savedAt }`. On open: read both files, reconstruct full session in WebView. On save: write clean markdown to `.md`, write sidecar JSON to `.criticmark`. Status bar indicator showing active file mode.
+- [x] **Phase B:** File mode toggle (sidecar) — `markdownFeedback.fileMode: "criticmarkup" | "sidecar"` workspace setting. In sidecar mode: `.md` file holds clean markdown (accept-all), `.criticmark` JSON sidecar holds `{ markup, comments, savedAt }`. On open: read sidecar if present, else treat `.md` as starting document. On save: write clean markdown to `.md`, write sidecar JSON to `.criticmark`. Status bar indicator showing active mode. Mode-switch confirmation when switching sidecar → CriticMarkup. Implemented in `extension/src/sidecarManager.ts`.
 
 **Phase 9 design decisions:**
 - `CustomTextEditorProvider` (not `CustomReadonlyEditorProvider`) — VS Code owns the document model, so dirty state, Cmd+S, and undo stack integration are free.

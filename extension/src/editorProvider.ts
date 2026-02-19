@@ -1,6 +1,13 @@
 import * as vscode from 'vscode'
 import * as fs from 'fs'
 import * as path from 'path'
+import {
+  getSidecarPath,
+  readSidecar,
+  writeSidecar,
+  deleteSidecar,
+  acceptAllChanges,
+} from './sidecarManager'
 
 type FileMode = 'criticmarkup' | 'sidecar'
 
@@ -19,14 +26,19 @@ interface WebViewMessage {
  * File mode A (criticmarkup, default):
  *   .md file IS the CriticMarkup document. Round-trips perfectly.
  *
- * File mode B (sidecar — Phase 9B):
- *   .md = clean markdown. .criticmark JSON sidecar = { markup, comments }.
+ * File mode B (sidecar):
+ *   .md = clean markdown (accept-all). .criticmark JSON sidecar = { markup, comments, savedAt }.
  */
 export class MarkdownFeedbackEditorProvider implements vscode.CustomTextEditorProvider {
   private readonly context: vscode.ExtensionContext
+  private readonly statusBar: vscode.StatusBarItem
+  private openPanelCount = 0
 
   constructor(context: vscode.ExtensionContext) {
     this.context = context
+    this.statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100)
+    this.statusBar.tooltip = 'Markdown Feedback file mode'
+    context.subscriptions.push(this.statusBar)
   }
 
   async resolveCustomTextEditor(
@@ -34,7 +46,8 @@ export class MarkdownFeedbackEditorProvider implements vscode.CustomTextEditorPr
     webviewPanel: vscode.WebviewPanel,
     _token: vscode.CancellationToken
   ): Promise<void> {
-    const fileMode = this.getFileMode()
+    this.openPanelCount++
+    this.updateStatusBar()
 
     webviewPanel.webview.options = {
       enableScripts: true,
@@ -43,14 +56,18 @@ export class MarkdownFeedbackEditorProvider implements vscode.CustomTextEditorPr
 
     webviewPanel.webview.html = this.getWebviewHtml()
 
-    // Pending resolve for the onWillSaveTextDocument pre-save hook
-    let pendingSaveResolve: ((markup: string) => void) | null = null
+    // Pending resolve for the onWillSaveTextDocument pre-save hook.
+    // Receives fresh markup+comments from the WebView synchronously before disk write.
+    let pendingSaveResolve:
+      | ((markup: string, comments: Record<string, string>) => void)
+      | null = null
 
     // ── Message handler (WebView → Host) ────────────────────────────────────
     webviewPanel.webview.onDidReceiveMessage(async (msg: WebViewMessage) => {
       switch (msg.type) {
         case 'ready': {
-          // WebView is loaded — send platform info then file content
+          // WebView has loaded — send platform info then file content
+          const fileMode = this.getFileMode()
           webviewPanel.webview.postMessage({
             type: 'platformCapabilities',
             platform: 'vscode',
@@ -71,13 +88,13 @@ export class MarkdownFeedbackEditorProvider implements vscode.CustomTextEditorPr
           const comments = msg.comments ?? {}
 
           if (pendingSaveResolve) {
-            // This documentChanged is the response to a saveRequested — resolve
-            // the pre-save hook with fresh content
-            pendingSaveResolve(markup)
+            // This documentChanged is the response to saveRequested —
+            // resolve the pre-save hook with the latest content
+            pendingSaveResolve(markup, comments)
             pendingSaveResolve = null
           } else {
-            // Normal debounced auto-save: update the TextDocument (marks dirty)
-            await this.applyEdit(document, fileMode, markup, comments)
+            // Normal debounced auto-save: update the TextDocument (marks file dirty)
+            await this.applyEdit(document, this.getFileMode(), markup, comments)
           }
           break
         }
@@ -85,23 +102,38 @@ export class MarkdownFeedbackEditorProvider implements vscode.CustomTextEditorPr
     })
 
     // ── Pre-save hook: flush latest WebView state before VS Code writes disk ─
+    //
+    // VS Code calls onWillSaveTextDocument before writing the file. We use
+    // waitUntil() to pause the write, request fresh content from the WebView,
+    // then resolve with TextEdits that replace the document content.
     const willSaveDisposable = vscode.workspace.onWillSaveTextDocument((e) => {
       if (e.document.uri.toString() !== document.uri.toString()) return
 
+      const fileMode = this.getFileMode()
+
       e.waitUntil(
         new Promise<vscode.TextEdit[]>((resolve) => {
-          pendingSaveResolve = (markup) => {
+          pendingSaveResolve = async (markup, comments) => {
             const fullRange = new vscode.Range(
               document.positionAt(0),
               document.positionAt(document.getText().length)
             )
-            resolve([vscode.TextEdit.replace(fullRange, markup)])
+
+            if (fileMode === 'sidecar') {
+              // Write the full state to the .criticmark sidecar
+              await writeSidecar(document.uri.fsPath, { markup, comments, savedAt: Date.now() })
+              // Write clean markdown (accept-all) to the .md TextDocument
+              resolve([vscode.TextEdit.replace(fullRange, acceptAllChanges(markup))])
+            } else {
+              // Mode A: write CriticMarkup directly to the .md file
+              resolve([vscode.TextEdit.replace(fullRange, markup)])
+            }
           }
 
           webviewPanel.webview.postMessage({ type: 'saveRequested' })
 
-          // Timeout: if WebView doesn't respond in time, fall through with
-          // whatever is already in the TextDocument
+          // Timeout: if the WebView doesn't respond in time (e.g. it's hidden),
+          // fall through and let VS Code write whatever is currently in the document
           setTimeout(() => {
             if (pendingSaveResolve) {
               pendingSaveResolve = null
@@ -112,21 +144,74 @@ export class MarkdownFeedbackEditorProvider implements vscode.CustomTextEditorPr
       )
     })
 
-    // ── External file change: reload WebView content ─────────────────────────
-    const changeDisposable = vscode.workspace.onDidChangeTextDocument(async (e) => {
-      // Only react to changes made outside our WebView (e.g. git checkout)
-      if (e.document.uri.toString() !== document.uri.toString()) return
-      if (e.reason === vscode.TextDocumentChangeReason.Undo ||
-          e.reason === vscode.TextDocumentChangeReason.Redo) return
+    // ── Config change: handle file mode switching ─────────────────────────────
+    const configDisposable = vscode.workspace.onDidChangeConfiguration(async (e) => {
+      if (!e.affectsConfiguration('markdownFeedback.fileMode')) return
 
-      const { markup, comments } = await this.loadContent(document, fileMode)
-      webviewPanel.webview.postMessage({ type: 'loadDocument', markup, comments, filePath: document.uri.fsPath })
+      const newMode = this.getFileMode()
+      this.updateStatusBar()
+
+      if (newMode === 'criticmarkup') {
+        // B → A: offer to delete the sidecar if one exists
+        const sidecarPath = getSidecarPath(document.uri.fsPath)
+        if (fs.existsSync(sidecarPath)) {
+          const choice = await vscode.window.showWarningMessage(
+            `Switched to CriticMarkup mode. The .criticmark sidecar is no longer needed. Delete it?`,
+            { modal: true },
+            'Delete Sidecar',
+            'Keep File'
+          )
+          if (choice === 'Delete Sidecar') {
+            await deleteSidecar(document.uri.fsPath)
+          }
+        }
+      } else {
+        // A → B: inform user that the sidecar will be created on next save
+        vscode.window.showInformationMessage(
+          'Switched to Sidecar mode. A .criticmark file will be created alongside your .md on next save.'
+        )
+      }
+    })
+
+    // ── External file change: reload WebView content ─────────────────────────
+    // Handles cases like git checkout or another editor modifying the file
+    const changeDisposable = vscode.workspace.onDidChangeTextDocument(async (e) => {
+      if (e.document.uri.toString() !== document.uri.toString()) return
+      if (
+        e.reason === vscode.TextDocumentChangeReason.Undo ||
+        e.reason === vscode.TextDocumentChangeReason.Redo
+      )
+        return
+
+      const { markup, comments } = await this.loadContent(document, this.getFileMode())
+      webviewPanel.webview.postMessage({
+        type: 'loadDocument',
+        markup,
+        comments,
+        filePath: document.uri.fsPath,
+      })
     })
 
     webviewPanel.onDidDispose(() => {
+      this.openPanelCount--
+      this.updateStatusBar()
       willSaveDisposable.dispose()
+      configDisposable.dispose()
       changeDisposable.dispose()
     })
+  }
+
+  // ── Status bar ────────────────────────────────────────────────────────────
+
+  private updateStatusBar(): void {
+    if (this.openPanelCount > 0) {
+      const mode = this.getFileMode()
+      this.statusBar.text = `$(edit) MF: ${mode === 'sidecar' ? 'Sidecar' : 'CriticMarkup'}`
+      this.statusBar.tooltip = `Markdown Feedback — file mode: ${mode}. Change via Settings → markdownFeedback.fileMode`
+      this.statusBar.show()
+    } else {
+      this.statusBar.hide()
+    }
   }
 
   // ── File content helpers ──────────────────────────────────────────────────
@@ -141,22 +226,16 @@ export class MarkdownFeedbackEditorProvider implements vscode.CustomTextEditorPr
     fileMode: FileMode
   ): Promise<{ markup: string; comments: Record<string, string> }> {
     if (fileMode === 'sidecar') {
-      // Phase 9B: read .criticmark sidecar if it exists
-      const sidecarPath = this.getSidecarPath(document.uri.fsPath)
-      if (fs.existsSync(sidecarPath)) {
-        try {
-          const raw = fs.readFileSync(sidecarPath, 'utf-8')
-          const parsed = JSON.parse(raw) as { markup: string; comments: Record<string, string> }
-          return { markup: parsed.markup ?? '', comments: parsed.comments ?? {} }
-        } catch {
-          // Corrupted sidecar: fall through to treating .md as original content
-        }
+      // Read .criticmark sidecar if it exists
+      const sidecar = readSidecar(document.uri.fsPath)
+      if (sidecar) {
+        return { markup: sidecar.markup ?? '', comments: sidecar.comments ?? {} }
       }
-      // No sidecar: treat the .md file as the original document (no tracked changes)
+      // No sidecar yet: treat the .md content as the starting document
       return { markup: document.getText(), comments: {} }
     }
 
-    // Mode A (default): .md IS the CriticMarkup document
+    // Mode A: .md IS the CriticMarkup document
     return { markup: document.getText(), comments: {} }
   }
 
@@ -166,33 +245,23 @@ export class MarkdownFeedbackEditorProvider implements vscode.CustomTextEditorPr
     markup: string,
     comments: Record<string, string>
   ): Promise<void> {
+    const edit = new vscode.WorkspaceEdit()
+    const fullRange = new vscode.Range(
+      document.positionAt(0),
+      document.positionAt(document.getText().length)
+    )
+
     if (fileMode === 'sidecar') {
-      // Phase 9B: derive clean markdown for .md, write markup to .criticmark
-      // For now, write the full markup to both until exportClean() is wired up
-      const sidecarPath = this.getSidecarPath(document.uri.fsPath)
-      const sidecar = JSON.stringify({ markup, comments, savedAt: Date.now() }, null, 2)
-      fs.writeFileSync(sidecarPath, sidecar, 'utf-8')
-      // TODO Phase 9B: write exportClean(markup) to the .md TextDocument instead
-      return
+      // Write full state to .criticmark sidecar
+      await writeSidecar(document.uri.fsPath, { markup, comments, savedAt: Date.now() })
+      // Write clean markdown to the .md TextDocument (marks it dirty)
+      edit.replace(document.uri, fullRange, acceptAllChanges(markup))
+    } else {
+      // Mode A: write CriticMarkup string directly to .md
+      edit.replace(document.uri, fullRange, markup)
     }
 
-    // Mode A: replace the entire TextDocument with the CriticMarkup string
-    const edit = new vscode.WorkspaceEdit()
-    edit.replace(
-      document.uri,
-      new vscode.Range(
-        document.positionAt(0),
-        document.positionAt(document.getText().length)
-      ),
-      markup
-    )
     await vscode.workspace.applyEdit(edit)
-  }
-
-  private getSidecarPath(mdPath: string): string {
-    const dir = path.dirname(mdPath)
-    const base = path.basename(mdPath, '.md')
-    return path.join(dir, `${base}.criticmark`)
   }
 
   // ── WebView HTML ──────────────────────────────────────────────────────────

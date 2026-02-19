@@ -1,6 +1,6 @@
 # Markdown Feedback — VSCode Extension
 
-**Status:** Phase 9A complete (scaffold + file mode A). Phase 9B (sidecar mode) planned.
+**Status:** Phase 9A+B complete (file mode A + sidecar mode). Next: pre-built `.vsix` release asset, Marketplace listing.
 **Author:** Geoff + Claude
 **Date:** 2026-02-17
 
@@ -76,10 +76,10 @@ To make Markdown Feedback the default for `.md` files in a specific project, add
 
 | Improvement | Phase |
 |---|---|
-| Pre-built `.vsix` attached to GitHub releases (no terminal needed) | Before Marketplace |
+| Pre-built `.vsix` attached to GitHub releases (no terminal needed) | Next |
 | VS Code Marketplace listing (one-click install from Extensions panel) | Post-9B |
-| Remap `Cmd+Shift+T` to a VS Code-safe shortcut | 9A polish |
-| Sidecar file mode (clean `.md` + `.criticmark` alongside) | 9B |
+| Remap `Cmd+Shift+T` to a VS Code-safe shortcut | Polish |
+| Sidecar file mode (clean `.md` + `.criticmark` alongside) | ✓ Done (9B) |
 
 ---
 
@@ -542,20 +542,22 @@ After Phase 8C hardening, the Zustand store exposes `capabilities`. The WebView 
 - Status bar indicator
 - VS Code Marketplace publication
 
-### Phase 9B: File mode toggle (sidecar)
+### Phase 9B: File mode toggle (sidecar) ✓ COMPLETE
 
 **Deliverables:**
-- `extension/src/sidecarManager.ts` — read/write `.criticmark` files, derive clean markdown
-- Workspace setting `markdownFeedback.fileMode`
-- Status bar item showing active mode
-- Mode-switch behavior: A→B on next save, B→A with confirmation prompt
+- `extension/src/sidecarManager.ts` — `readSidecar`, `writeSidecar`, `deleteSidecar`, `acceptAllChanges`
+- Workspace setting `markdownFeedback.fileMode` (already in manifest from 9A)
+- Status bar item showing active mode (`$(edit) MF: CriticMarkup` / `$(edit) MF: Sidecar`)
+- Mode-switch: A→B shows info toast, B→A shows confirmation dialog + optionally deletes sidecar
+- Dynamic `fileMode` reading per-operation (responds to setting changes without restart)
 
 **Acceptance criteria:**
-1. Set `markdownFeedback.fileMode: "sidecar"` in workspace settings
-2. Open `.md` file → editor loads original clean markdown with no tracked changes
-3. Make edits → Cmd+S → `.md` file contains clean markdown, `.criticmark` sidecar created
-4. Close and reopen → tracked changes reconstructed from sidecar, `.md` unchanged
-5. Switch back to `"criticmarkup"` mode → Cmd+S → `.criticmark` deleted (after confirmation), `.md` contains CriticMarkup
+1. ✓ Set `markdownFeedback.fileMode: "sidecar"` in workspace settings
+2. ✓ Open `.md` file → editor loads original clean markdown with no tracked changes
+3. ✓ Make edits → Cmd+S → `.md` file contains clean markdown, `.criticmark` sidecar created alongside
+4. ✓ Close and reopen → tracked changes reconstructed from sidecar, `.md` unchanged
+5. ✓ Switch back to `"criticmarkup"` → confirmation dialog → sidecar deleted (or kept), `.md` contains CriticMarkup on next save
+6. ✓ Status bar shows active mode whenever a Markdown Feedback editor is open
 
 ---
 
