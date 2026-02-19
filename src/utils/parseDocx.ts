@@ -66,5 +66,12 @@ export async function parseDocx(buffer: ArrayBuffer): Promise<DocxParseResult> {
     }
   }
 
-  return docxToMarkdown(documentXml, commentsXml, numberingXml)
+  const { markup } = docxToMarkdown(documentXml, commentsXml, numberingXml)
+
+  // Count from the final markup string — more reliable than walk-based counting,
+  // which can miss tokens in edge-case OOXML structures.
+  const changeCount = (markup.match(/\{--|\{\+\+|\{~~/g) ?? []).length
+  const commentCount = (markup.match(/\{>>/g) ?? []).length
+
+  return { markup, changeCount, commentCount }
 }

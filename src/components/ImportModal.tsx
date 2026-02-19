@@ -154,6 +154,11 @@ export default function ImportModal({
                 Import a .docx file exported from Google Docs. Tracked changes
                 (suggestions) and comments will be preserved.
               </p>
+              <p className="text-xs text-gray-400">
+                <strong>Known limitation:</strong> Google Docs strips tables
+                when exporting to .docx. Tables are supported in Microsoft Word
+                .docx files.
+              </p>
 
               <div>
                 <input
