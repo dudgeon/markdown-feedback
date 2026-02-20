@@ -53,6 +53,14 @@ Then in VS Code: **Cmd+Shift+P** → "Extensions: Install from VSIX…" → sele
 
 After installation, the extension activates automatically. Open any `.md` file and choose "Open With → Markdown Feedback Editor" as described above.
 
+### Uninstall
+
+1. Open the Extensions panel (**Cmd+Shift+X**)
+2. Search for "Markdown Feedback"
+3. Click the gear icon → **Uninstall**
+
+Or via Command Palette: **Cmd+Shift+P** → "Extensions: Uninstall Extension" → select "Markdown Feedback".
+
 ### First-time "Open With" experience
 
 VS Code's "Open With" prompt appears when you right-click the tab of an open file (or the file in the Explorer sidebar). The Markdown Feedback Editor will appear as an option because the extension registered as an `"option"` priority editor for `*.md` files — it does not hijack the default editor.

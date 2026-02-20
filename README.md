@@ -86,6 +86,10 @@ That's it. To make Markdown Feedback the default editor for `.md` files in a pro
 }
 ```
 
+### Uninstall
+
+Open the Extensions panel (**Cmd+Shift+X**) → find "Markdown Feedback" → gear icon → **Uninstall**.
+
 Full setup instructions, file mode options, and known limitations: [docs/vscode-extension.md](docs/vscode-extension.md#0-setup--testing)
 
 ## Quick Start (Development)

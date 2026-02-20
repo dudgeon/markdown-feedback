@@ -3,9 +3,11 @@ import { useEffect, useCallback } from 'react'
 interface AboutPanelProps {
   isOpen: boolean
   onClose: () => void
+  fontPreference: 'default' | 'literata'
+  onFontToggle: () => void
 }
 
-export default function AboutPanel({ isOpen, onClose }: AboutPanelProps) {
+export default function AboutPanel({ isOpen, onClose, fontPreference, onFontToggle }: AboutPanelProps) {
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
@@ -79,6 +81,34 @@ export default function AboutPanel({ isOpen, onClose }: AboutPanelProps) {
             data sent anywhere. Sessions persist in local storage, so avoid
             pasting sensitive content on shared computers.
           </p>
+
+          <p className="mt-6 text-[10px] font-semibold tracking-widest uppercase text-gray-400">
+            Editor Font
+          </p>
+
+          <div className="mt-3 flex items-center gap-1 bg-gray-100 rounded-lg p-1 w-fit">
+            <button
+              onClick={() => fontPreference !== 'default' && onFontToggle()}
+              className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                fontPreference === 'default'
+                  ? 'bg-white text-gray-900 shadow-sm font-medium'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Default
+            </button>
+            <button
+              onClick={() => fontPreference !== 'literata' && onFontToggle()}
+              className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                fontPreference === 'literata'
+                  ? 'bg-white text-gray-900 shadow-sm font-medium'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+              style={fontPreference === 'literata' ? { fontFamily: "'Literata', Georgia, serif" } : undefined}
+            >
+              Literata
+            </button>
+          </div>
 
           <p className="mt-6 text-[10px] font-semibold tracking-widest uppercase text-gray-400">
             Keyboard Shortcuts

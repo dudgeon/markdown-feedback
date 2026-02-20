@@ -37,6 +37,9 @@ export default function Editor() {
   const [importOpen, setImportOpen] = useState(false)
   const [panelOpen, setPanelOpen] = useState(() => window.innerWidth >= 1024)
   const [aboutOpen, setAboutOpen] = useState(false)
+  const [fontPreference, setFontPreference] = useState<'default' | 'literata'>(
+    () => (localStorage.getItem('fontPreference') as 'default' | 'literata') ?? 'default'
+  )
 
   // Store state
   const rawMarkup = useDocumentStore((s) => s.rawMarkup)
@@ -138,6 +141,27 @@ export default function Editor() {
     }
   }, [debouncedMarkupForSave]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Load Literata from Google Fonts when the serif option is selected.
+  // Falls back to Georgia if the network is unavailable (e.g. VS Code WebView).
+  useEffect(() => {
+    const linkId = 'literata-font-link'
+    let link = document.getElementById(linkId) as HTMLLinkElement | null
+    if (fontPreference === 'literata') {
+      if (!link) {
+        link = document.createElement('link')
+        link.id = linkId
+        link.rel = 'stylesheet'
+        link.href =
+          'https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,300..700;1,7..72,300..700&display=swap'
+        document.head.appendChild(link)
+      }
+      localStorage.setItem('fontPreference', 'literata')
+    } else {
+      link?.remove()
+      localStorage.setItem('fontPreference', 'default')
+    }
+  }, [fontPreference])
+
   // Close mobile drawer on Escape
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -180,7 +204,7 @@ export default function Editor() {
 
       <div className="flex flex-col lg:flex-row lg:gap-4 flex-1 min-h-0">
         <div className="flex-1 min-w-0 min-h-0 overflow-y-auto pb-4 lg:pb-6">
-          <div className="border border-gray-300 rounded-lg bg-white shadow-sm">
+          <div className={`border border-gray-300 rounded-lg bg-white shadow-sm${fontPreference === 'literata' ? ' editor-font-literata' : ''}`}>
             <EditorContent editor={editor} />
           </div>
 
@@ -227,6 +251,8 @@ export default function Editor() {
       <AboutPanel
         isOpen={aboutOpen}
         onClose={() => setAboutOpen(false)}
+        fontPreference={fontPreference}
+        onFontToggle={() => setFontPreference((prev) => (prev === 'default' ? 'literata' : 'default'))}
       />
 
       {showRecovery && recoverySession && (
