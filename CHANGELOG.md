@@ -1,5 +1,19 @@
 # Changelog
 
+## [v1.2.1] — 2026-02-19
+
+### Features
+
+- Literata font toggle in the About panel — switches the editor between the default sans-serif and Literata (serif reading font). Preference persists across sessions.
+
+### Fixes
+
+- VS Code extension: editor text was grey instead of black due to VS Code theme variables bleeding into the WebView. Body color is now explicitly pinned.
+
+### Docs
+
+- VS Code extension: uninstall instructions added to README and spec doc
+
 ## [v1.2.0] — 2026-02-19
 
 ### Features
