@@ -9,6 +9,12 @@ import { nanoid } from 'nanoid'
 // immune to this lifecycle.
 let _trackingEnabled = true
 
+// Timestamp of the last deletion handled by handleKeyDown.
+// Guards against double-processing if beforeinput fires after handleKeyDown
+// already handled the same event. On desktop this shouldn't happen (handleKeyDown's
+// preventDefault stops beforeinput), but this is a safety net for edge cases.
+let _lastDeleteHandledAt = 0
+
 export function getTrackingEnabled(): boolean {
   return _trackingEnabled
 }
@@ -149,6 +155,101 @@ export const TrackChanges = Extension.create({
         key: new PluginKey('trackChanges'),
 
         props: {
+          // iOS virtual keyboards fire keydown with key:"Unidentified" for
+          // Backspace/Delete. beforeinput with inputType catches these reliably.
+          // On desktop, handleKeyDown returns true → preventDefault() → beforeinput
+          // never fires. On iOS, handleKeyDown returns false → beforeinput fires.
+          handleDOMEvents: {
+            beforeinput(view: EditorView, event: InputEvent) {
+              if (!_trackingEnabled) return false
+
+              const inputType = event.inputType
+
+              // Only handle deletion inputTypes. Text insertion is handled by
+              // handleTextInput. Composition events are non-cancelable.
+              const isDeletion =
+                inputType === 'deleteContentBackward' ||
+                inputType === 'deleteContentForward' ||
+                inputType === 'deleteWordBackward' ||
+                inputType === 'deleteWordForward' ||
+                inputType === 'deleteSoftLineBackward' ||
+                inputType === 'deleteSoftLineForward' ||
+                inputType === 'deleteHardLineBackward' ||
+                inputType === 'deleteHardLineForward' ||
+                inputType === 'deleteByCut' ||
+                inputType === 'deleteByDrag'
+
+              if (!isDeletion) return false
+
+              // Guard: if handleKeyDown just handled this deletion, skip.
+              if (Date.now() - _lastDeleteHandledAt < 50) return false
+
+              const { state } = view
+              const { selection } = state
+              const { from, to, empty } = selection
+
+              // Word/line deletions: use getTargetRanges() for the affected range
+              if (
+                inputType === 'deleteWordBackward' ||
+                inputType === 'deleteWordForward' ||
+                inputType === 'deleteSoftLineBackward' ||
+                inputType === 'deleteSoftLineForward' ||
+                inputType === 'deleteHardLineBackward' ||
+                inputType === 'deleteHardLineForward'
+              ) {
+                if (!empty) {
+                  const handled = handleRangeDelete(view, from, to)
+                  if (handled) { event.preventDefault(); return true }
+                  return false
+                }
+
+                const targetRanges = event.getTargetRanges()
+                if (targetRanges.length > 0) {
+                  const range = targetRanges[0]
+                  const rangeFrom = view.posAtDOM(range.startContainer, range.startOffset)
+                  const rangeTo = view.posAtDOM(range.endContainer, range.endOffset)
+                  if (rangeFrom !== rangeTo) {
+                    const handled = handleRangeDelete(
+                      view,
+                      Math.min(rangeFrom, rangeTo),
+                      Math.max(rangeFrom, rangeTo)
+                    )
+                    if (handled) { event.preventDefault(); return true }
+                    return false
+                  }
+                }
+
+                // Fallback: treat as single char delete
+                const key = inputType.includes('Backward') ? 'Backspace' : 'Delete'
+                const handled = handleSingleCharDelete(view, key, from)
+                if (handled) { event.preventDefault(); return true }
+                return false
+              }
+
+              // Cut and drag: always range
+              if (inputType === 'deleteByCut' || inputType === 'deleteByDrag') {
+                if (!empty) {
+                  const handled = handleRangeDelete(view, from, to)
+                  if (handled) { event.preventDefault(); return true }
+                }
+                return false
+              }
+
+              // Single character deletions (deleteContentBackward/Forward)
+              const key = inputType === 'deleteContentBackward' ? 'Backspace' : 'Delete'
+
+              if (empty) {
+                const handled = handleSingleCharDelete(view, key, from)
+                if (handled) { event.preventDefault(); return true }
+                return false
+              } else {
+                const handled = handleRangeDelete(view, from, to)
+                if (handled) { event.preventDefault(); return true }
+                return false
+              }
+            },
+          },
+
           handleKeyDown(view, event) {
             const { state } = view
             const { selection } = state
@@ -207,9 +308,13 @@ export const TrackChanges = Extension.create({
             }
 
             if (empty) {
-              return handleSingleCharDelete(view, event.key, from)
+              const handled = handleSingleCharDelete(view, event.key, from)
+              if (handled) _lastDeleteHandledAt = Date.now()
+              return handled
             } else {
-              return handleRangeDelete(view, from, to)
+              const handled = handleRangeDelete(view, from, to)
+              if (handled) _lastDeleteHandledAt = Date.now()
+              return handled
             }
           },
 
@@ -323,6 +428,13 @@ export const TrackChanges = Extension.create({
 
       if (charPos < 0 || charEnd > state.doc.content.size) return false
 
+      // If cursor is at the start (Backspace) or end (Delete) of a block node,
+      // return false so ProseMirror's default joinBackward/joinForward handles
+      // the block merge. Without this the cursor gets stuck in deletion spans.
+      const $cursor = state.doc.resolve(cursorPos)
+      if (isBackspace && $cursor.parentOffset === 0) return false
+      if (!isBackspace && $cursor.parentOffset === $cursor.parent.content.size) return false
+
       // Resolve the position to find the text node
       const $pos = state.doc.resolve(charPos)
       const textNode = $pos.parent.maybeChild($pos.index())
@@ -335,9 +447,8 @@ export const TrackChanges = Extension.create({
 
       // If already deleted — skip cursor over the deletion span
       if (deletionType.isInSet(textNode.marks)) {
-        const tr = state.tr
         if (isBackspace) {
-          // Jump cursor to before the deletion span
+          // Scan backward to find the start of this deletion run
           let scanPos = charPos
           while (scanPos > 0) {
             const $scan = state.doc.resolve(scanPos)
@@ -350,11 +461,16 @@ export const TrackChanges = Extension.create({
             }
             scanPos--
           }
-          tr.setSelection(
-            TextSelection.near(state.doc.resolve(scanPos + 1))
-          )
+          // If the scan landed at the start of a block, fall through to
+          // ProseMirror's default joinBackward rather than placing the cursor
+          // at the block boundary (which would cause an infinite loop).
+          const $target = state.doc.resolve(scanPos + 1)
+          if ($target.parentOffset === 0) return false
+          const tr = state.tr
+          tr.setSelection(TextSelection.near($target))
+          dispatch(tr)
         } else {
-          // Jump cursor to after the deletion span
+          // Scan forward to find the end of this deletion run
           let scanPos = charEnd
           while (scanPos < state.doc.content.size) {
             const $scan = state.doc.resolve(scanPos)
@@ -367,9 +483,12 @@ export const TrackChanges = Extension.create({
             }
             scanPos++
           }
-          tr.setSelection(TextSelection.near(state.doc.resolve(scanPos)))
+          const $target = state.doc.resolve(scanPos)
+          if ($target.parentOffset === $target.parent.content.size) return false
+          const tr = state.tr
+          tr.setSelection(TextSelection.near($target))
+          dispatch(tr)
         }
-        dispatch(tr)
         return true
       }
 

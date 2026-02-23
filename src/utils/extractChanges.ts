@@ -1,12 +1,22 @@
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
 
+/**
+ * A single comment thread entry attached to a tracked change or highlight.
+ * Multiple threads per change are supported (reply threads).
+ * Serialized as adjacent {>>...<<} blocks in CriticMarkup output.
+ */
+export interface CommentThread {
+  id: string
+  text: string
+}
+
 export interface ChangeEntry {
   type: 'deletion' | 'insertion' | 'substitution' | 'highlight'
   id: string
   deletedText?: string
   insertedText?: string
   highlightedText?: string
-  comment?: string
+  comments?: CommentThread[]
   contextBefore: string
   contextAfter: string
   from: number
@@ -35,7 +45,7 @@ interface PositionedSegment {
  */
 export function extractChanges(
   doc: ProseMirrorNode,
-  comments: Record<string, string> = {}
+  comments: Record<string, CommentThread[]> = {}
 ): ChangeEntry[] {
   const changes: ChangeEntry[] = []
 
@@ -46,14 +56,39 @@ export function extractChanges(
     changes.push(...blockChanges)
   })
 
-  // Merge comments into entries
+  // Merge consecutive highlight entries with the same ID across block boundaries.
+  // ProseMirror marks cannot span block nodes, so a single highlight selection
+  // spanning multiple paragraphs produces one mark per block — all sharing the
+  // same `id`. Merge them into one ChangeEntry here so the panel shows a single
+  // highlight card.
+  const merged: ChangeEntry[] = []
   for (const change of changes) {
-    if (comments[change.id]) {
-      change.comment = comments[change.id]
+    const prev = merged[merged.length - 1]
+    if (
+      change.type === 'highlight' &&
+      prev?.type === 'highlight' &&
+      prev.id === change.id
+    ) {
+      prev.highlightedText = (prev.highlightedText ?? '') + '\n' + (change.highlightedText ?? '')
+      prev.to = change.to
+      prev.contextAfter = change.contextAfter
+      // Merge comment threads from each block-segment into the unified entry
+      if (change.comments?.length) {
+        prev.comments = [...(prev.comments ?? []), ...change.comments]
+      }
+    } else {
+      merged.push(change)
     }
   }
 
-  return changes
+  // Merge comment threads into entries
+  for (const change of merged) {
+    if (comments[change.id]?.length) {
+      change.comments = comments[change.id]
+    }
+  }
+
+  return merged
 }
 
 /** Collect inline segments with position info from a block node. */

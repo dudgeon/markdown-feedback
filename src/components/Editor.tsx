@@ -13,6 +13,7 @@ import Toolbar from './Toolbar'
 import ChangesPanel from './ChangesPanel'
 import AboutPanel from './AboutPanel'
 import RecoveryModal from './RecoveryModal'
+import SelectionToolbar from './SelectionToolbar'
 import { criticMarkupToHTML } from '../utils/parseCriticMarkup'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { useDocumentStore } from '../stores/documentStore'
@@ -53,11 +54,14 @@ export default function Editor() {
   const setEditor = useDocumentStore((s) => s.setEditor)
   const handleEditorChange = useDocumentStore((s) => s.handleEditorChange)
   const importDocument = useDocumentStore((s) => s.importDocument)
-  const setComment = useDocumentStore((s) => s.setComment)
+  const addComment = useDocumentStore((s) => s.addComment)
+  const editComment = useDocumentStore((s) => s.editComment)
+  const deleteComment = useDocumentStore((s) => s.deleteComment)
   const scrollToChange = useDocumentStore((s) => s.scrollToChange)
   const clearFocusComment = useDocumentStore((s) => s.clearFocusComment)
   const returnToEditor = useDocumentStore((s) => s.returnToEditor)
   const toggleTracking = useDocumentStore((s) => s.toggleTracking)
+  const revertChange = useDocumentStore((s) => s.revertChange)
   const checkForRecovery = useDocumentStore((s) => s.checkForRecovery)
   const resumeSession = useDocumentStore((s) => s.resumeSession)
   const startFresh = useDocumentStore((s) => s.startFresh)
@@ -179,7 +183,10 @@ export default function Editor() {
     <ChangesPanel
       changes={changes}
       onScrollTo={scrollToChange}
-      onCommentChange={setComment}
+      onAddComment={addComment}
+      onEditComment={editComment}
+      onDeleteComment={deleteComment}
+      onRevert={revertChange}
       focusCommentId={focusCommentId}
       onFocusHandled={clearFocusComment}
       onReturnToEditor={returnToEditor}
@@ -262,6 +269,14 @@ export default function Editor() {
           onStartFresh={startFresh}
         />
       )}
+
+      <SelectionToolbar
+        editor={editor ?? null}
+        onHighlight={() => {
+          useDocumentStore.getState().createHighlight()
+          setPanelOpen(true)
+        }}
+      />
     </div>
   )
 }

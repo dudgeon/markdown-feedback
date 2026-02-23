@@ -1,10 +1,11 @@
 import type { PlatformAdapter, SavedSession } from './types'
+import type { CommentThread } from '../../utils/extractChanges'
 
 const STORAGE_KEY = 'markdown-feedback-session'
 
 export function createWebPersistence(): PlatformAdapter {
   return {
-    async save(markup: string, comments: Record<string, string>) {
+    async save(markup: string, comments: Record<string, CommentThread[]>) {
       try {
         const session: SavedSession = {
           markup,

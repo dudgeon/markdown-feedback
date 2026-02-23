@@ -1,5 +1,18 @@
 # Changelog
 
+## [v1.3.0] — 2026-02-21
+
+### Features
+
+- Floating selection toolbar — a "Highlight" button appears above any text selection, providing a mouse-accessible alternative to the Cmd+Shift+H keyboard shortcut
+- Per-change revert button — each card in the Changes Panel now has a revert icon (↩) to undo that specific tracked change
+- Multi-comment threads — changes and highlights can have multiple replies; each thread entry supports inline editing (click to edit) and deletion (hover to reveal × button)
+
+### Fixes
+
+- Multi-paragraph highlights now merge into a single change card; previously selecting text across paragraph boundaries created one card per paragraph
+- Cross-paragraph deletion no longer gets blocked at line boundaries; backspacing or deleting across a paragraph break now works as expected
+
 ## [v1.2.1] — 2026-02-19
 
 ### Features

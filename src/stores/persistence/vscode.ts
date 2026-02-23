@@ -35,14 +35,14 @@ function getApi() {
 
 export function createVSCodePersistence(): PlatformAdapter {
   return {
-    async save(markup: string, comments: Record<string, string>) {
+    async save(markup: string, comments: Record<string, import('../../utils/extractChanges').CommentThread[]>) {
       getApi().postMessage({ type: 'documentChanged', markup, comments })
     },
 
     async load(): Promise<SavedSession | null> {
       return new Promise((resolve) => {
         const handler = (event: MessageEvent) => {
-          const msg = event.data as { type: string; markup?: string; comments?: Record<string, string> }
+          const msg = event.data as { type: string; markup?: string; comments?: Record<string, import('../../utils/extractChanges').CommentThread[]> }
           if (msg?.type === 'loadDocument') {
             window.removeEventListener('message', handler)
             // Empty file → resolve null so checkForRecovery skips auto-import

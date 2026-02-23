@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import type { Editor as TipTapEditor } from '@tiptap/core'
 import { nanoid } from 'nanoid'
 import { serializeCriticMarkup } from '../utils/serializeCriticMarkup'
-import { extractChanges, type ChangeEntry } from '../utils/extractChanges'
+import { extractChanges, type ChangeEntry, type CommentThread } from '../utils/extractChanges'
 import { criticMarkupToHTML } from '../utils/parseCriticMarkup'
 import { createPersistence, type SavedSession } from './persistence'
 import { getTrackingEnabled, setTrackingEnabled } from '../extensions/trackChanges'
@@ -11,7 +11,7 @@ const persistence = createPersistence()
 
 interface DocumentState {
   // Document data
-  comments: Record<string, string>
+  comments: Record<string, CommentThread[]>
   changes: ChangeEntry[]
   rawMarkup: string
 
@@ -35,9 +35,12 @@ interface DocumentActions {
   setEditor: (editor: TipTapEditor) => void
   handleEditorChange: (editor: TipTapEditor) => void
   importDocument: (text: string) => void
-  setComment: (id: string, text: string) => void
+  addComment: (changeId: string, text: string) => void
+  editComment: (changeId: string, threadId: string, text: string) => void
+  deleteComment: (changeId: string, threadId: string) => void
   scrollToChange: (from: number, to: number) => void
   createHighlight: () => void
+  revertChange: (id: string) => void
   returnToEditor: () => void
   setFocusCommentId: (id: string | null) => void
   clearFocusComment: () => void
@@ -102,17 +105,59 @@ export const useDocumentStore = create<DocumentState & DocumentActions>(
       editor.commands.setContent(html)
     },
 
-    setComment: (id, text) => {
+    addComment: (changeId, text) => {
+      if (!text.trim()) return
       const { editor, comments } = get()
-      const updatedComments = { ...comments }
-      if (text) {
-        updatedComments[id] = text
-      } else {
-        delete updatedComments[id]
+      const newThread: CommentThread = { id: nanoid(8), text: text.trim() }
+      const updatedComments: Record<string, CommentThread[]> = {
+        ...comments,
+        [changeId]: [...(comments[changeId] ?? []), newThread],
       }
       set({ comments: updatedComments })
+      if (editor) {
+        set({
+          rawMarkup: serializeCriticMarkup(editor.state.doc, updatedComments),
+          changes: extractChanges(editor.state.doc, updatedComments),
+        })
+      }
+    },
 
-      // Re-serialize and re-extract with updated comments
+    editComment: (changeId, threadId, text) => {
+      const { editor, comments } = get()
+      const existing = comments[changeId] ?? []
+      const updatedComments = { ...comments }
+      if (!text.trim()) {
+        // Empty → delete this thread
+        const remaining = existing.filter((t) => t.id !== threadId)
+        if (remaining.length === 0) {
+          delete updatedComments[changeId]
+        } else {
+          updatedComments[changeId] = remaining
+        }
+      } else {
+        updatedComments[changeId] = existing.map((t) =>
+          t.id === threadId ? { ...t, text: text.trim() } : t
+        )
+      }
+      set({ comments: updatedComments })
+      if (editor) {
+        set({
+          rawMarkup: serializeCriticMarkup(editor.state.doc, updatedComments),
+          changes: extractChanges(editor.state.doc, updatedComments),
+        })
+      }
+    },
+
+    deleteComment: (changeId, threadId) => {
+      const { editor, comments } = get()
+      const remaining = (comments[changeId] ?? []).filter((t) => t.id !== threadId)
+      const updatedComments = { ...comments }
+      if (remaining.length === 0) {
+        delete updatedComments[changeId]
+      } else {
+        updatedComments[changeId] = remaining
+      }
+      set({ comments: updatedComments })
       if (editor) {
         set({
           rawMarkup: serializeCriticMarkup(editor.state.doc, updatedComments),
@@ -143,6 +188,95 @@ export const useDocumentStore = create<DocumentState & DocumentActions>(
       )
       editor.view.dispatch(tr)
       set({ focusCommentId: id })
+    },
+
+    revertChange: (id) => {
+      const { editor, comments, changes } = get()
+      if (!editor) return
+      const change = changes.find((c) => c.id === id)
+      if (!change) return
+
+      const doc = editor.state.doc
+      const tr = editor.state.tr
+
+      if (change.type === 'highlight') {
+        doc.nodesBetween(0, doc.content.size, (node, pos) => {
+          if (!node.isText) return
+          const hlMark = node.marks.find(
+            (m) => m.type.name === 'trackedHighlight' && m.attrs.id === id
+          )
+          if (hlMark) tr.removeMark(pos, pos + node.nodeSize, hlMark)
+        })
+      } else if (change.type === 'deletion') {
+        doc.nodesBetween(0, doc.content.size, (node, pos) => {
+          if (!node.isText) return
+          const delMark = node.marks.find(
+            (m) => m.type.name === 'trackedDeletion' && m.attrs.id === id
+          )
+          if (delMark) tr.removeMark(pos, pos + node.nodeSize, delMark)
+        })
+      } else if (change.type === 'insertion') {
+        const ranges: { from: number; to: number }[] = []
+        doc.nodesBetween(0, doc.content.size, (node, pos) => {
+          if (!node.isText) return
+          const insMark = node.marks.find(
+            (m) => m.type.name === 'trackedInsertion' && m.attrs.id === id
+          )
+          if (insMark) ranges.push({ from: pos, to: pos + node.nodeSize })
+        })
+        for (let i = ranges.length - 1; i >= 0; i--) {
+          tr.delete(tr.mapping.map(ranges[i].from), tr.mapping.map(ranges[i].to))
+        }
+      } else if (change.type === 'substitution') {
+        // change.id is the deletion's ID; find the paired insertion ID
+        let insId: string | null = null
+        doc.nodesBetween(0, doc.content.size, (node) => {
+          if (!node.isText || insId) return
+          const delMark = node.marks.find(
+            (m) => m.type.name === 'trackedDeletion' && m.attrs.id === id
+          )
+          if (delMark?.attrs.pairedWith) insId = delMark.attrs.pairedWith
+        })
+
+        // Delete insertion text first (it sits after deletion in the doc — higher pos)
+        if (insId) {
+          const insRanges: { from: number; to: number }[] = []
+          doc.nodesBetween(0, doc.content.size, (node, pos) => {
+            if (!node.isText) return
+            const insMark = node.marks.find(
+              (m) => m.type.name === 'trackedInsertion' && m.attrs.id === insId
+            )
+            if (insMark) insRanges.push({ from: pos, to: pos + node.nodeSize })
+          })
+          for (let i = insRanges.length - 1; i >= 0; i--) {
+            tr.delete(tr.mapping.map(insRanges[i].from), tr.mapping.map(insRanges[i].to))
+          }
+        }
+
+        // Remove deletion marks (positions shift after insertion delete, use mapping)
+        doc.nodesBetween(0, doc.content.size, (node, pos) => {
+          if (!node.isText) return
+          const delMark = node.marks.find(
+            (m) => m.type.name === 'trackedDeletion' && m.attrs.id === id
+          )
+          if (delMark) {
+            tr.removeMark(
+              tr.mapping.map(pos),
+              tr.mapping.map(pos + node.nodeSize),
+              delMark
+            )
+          }
+        })
+      }
+
+      editor.view.dispatch(tr)
+
+      // Clean up any comment threads associated with this change
+      if (comments[id]?.length) {
+        const updatedComments = { ...comments }
+        delete updatedComments[id]
+        set({ comments: updatedComments })
+      }
     },
 
     returnToEditor: () => {

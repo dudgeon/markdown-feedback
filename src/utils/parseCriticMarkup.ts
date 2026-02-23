@@ -1,4 +1,5 @@
 import { nanoid } from 'nanoid'
+import type { CommentThread } from './extractChanges'
 
 export interface ParsedSegment {
   text: string
@@ -102,15 +103,18 @@ export function parseCriticMarkup(text: string): ParsedSegment[] {
 }
 
 /**
- * Extract comments from parsed segments by linking each comment to the
- * preceding change or highlight segment.
+ * Extract comment threads from parsed segments by linking each comment token
+ * to the preceding change or highlight segment.
  *
- * Returns a Record mapping change/highlight IDs to comment text.
+ * Multiple consecutive {>>…<<} blocks after a single change each become their
+ * own CommentThread entry in the array — enabling reply threads.
+ *
+ * Returns a Record mapping change/highlight IDs to arrays of CommentThread.
  */
 export function extractCommentsFromSegments(
   segments: ParsedSegment[]
-): Record<string, string> {
-  const comments: Record<string, string> = {}
+): Record<string, CommentThread[]> {
+  const threads: Record<string, CommentThread[]> = {}
 
   for (let i = 0; i < segments.length; i++) {
     if (segments[i].type !== 'comment') continue
@@ -130,13 +134,14 @@ export function extractCommentsFromSegments(
         const key = (prev.type === 'insertion' && prev.pairedWith)
           ? prev.pairedWith
           : prev.id
-        comments[key] = segments[i].text
+        if (!threads[key]) threads[key] = []
+        threads[key].push({ id: nanoid(8), text: segments[i].text })
         break
       }
     }
   }
 
-  return comments
+  return threads
 }
 
 /**
@@ -152,12 +157,12 @@ export function extractCommentsFromSegments(
  */
 export function criticMarkupToHTML(text: string): {
   html: string
-  comments: Record<string, string>
+  comments: Record<string, CommentThread[]>
 } {
   const stripped = stripFrontmatter(text)
   const blocks = splitIntoBlocks(stripped)
   const htmlBlocks: string[] = []
-  const allComments: Record<string, string> = {}
+  const allComments: Record<string, CommentThread[]> = {}
 
   for (const block of blocks) {
     if (!block.trim()) continue
@@ -179,7 +184,13 @@ export function criticMarkupToHTML(text: string): {
     // Parse CriticMarkup tokens within this block
     const segments = parseCriticMarkup(content)
     const blockComments = extractCommentsFromSegments(segments)
-    Object.assign(allComments, blockComments)
+    for (const [key, newThreads] of Object.entries(blockComments)) {
+      if (allComments[key]) {
+        allComments[key] = [...allComments[key], ...newThreads]
+      } else {
+        allComments[key] = newThreads
+      }
+    }
     const inner = segments.map(segmentToHTML).join('')
 
     htmlBlocks.push(`<${tag}>${inner}</${tag}>`)

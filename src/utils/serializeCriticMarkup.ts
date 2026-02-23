@@ -1,4 +1,5 @@
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
+import type { CommentThread } from './extractChanges'
 
 interface Segment {
   text: string
@@ -21,7 +22,7 @@ interface Segment {
  */
 export function serializeCriticMarkup(
   doc: ProseMirrorNode,
-  comments: Record<string, string> = {}
+  comments: Record<string, CommentThread[]> = {}
 ): string {
   const blocks: string[] = []
 
@@ -59,16 +60,19 @@ function collectSegments(blockNode: ProseMirrorNode): Segment[] {
   return segments
 }
 
-/** Append a comment suffix if the given ID has a comment in the Record. */
-function commentSuffix(id: string | null, comments: Record<string, string>): string {
-  if (!id || !comments[id]) return ''
-  return `{>>${comments[id]}<<}`
+/**
+ * Emit one {>>…<<} block per comment thread following a change/highlight.
+ * Multiple threads produce multiple adjacent blocks, which is valid CriticMarkup.
+ */
+function commentSuffix(id: string | null, comments: Record<string, CommentThread[]>): string {
+  if (!id || !comments[id]?.length) return ''
+  return comments[id].map((t) => `{>>${t.text}<<}`).join('')
 }
 
 /** Convert a flat array of segments into a CriticMarkup string. */
 function serializeSegments(
   segments: Segment[],
-  comments: Record<string, string>
+  comments: Record<string, CommentThread[]>
 ): string {
   let result = ''
   // Track insertion IDs that have been consumed by a substitution

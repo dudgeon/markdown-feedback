@@ -1,6 +1,8 @@
+import type { CommentThread } from '../../utils/extractChanges'
+
 export interface SavedSession {
   markup: string
-  comments: Record<string, string>
+  comments: Record<string, CommentThread[]>
   savedAt: number
 }
 
@@ -19,7 +21,7 @@ export interface PlatformCapabilities {
 
 export interface PlatformAdapter {
   // ── Session persistence (all platforms) ────────────────────────────────────
-  save(markup: string, comments: Record<string, string>): Promise<void>
+  save(markup: string, comments: Record<string, CommentThread[]>): Promise<void>
   load(): Promise<SavedSession | null>
   clear(): Promise<void>
 
