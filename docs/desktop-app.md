@@ -561,52 +561,17 @@ src/utils/fileOps/
 
 ## 8. Known Limitations & Accepted Defects
 
-### 8.1 iOS Input Handling (ACCEPTED DEFECT)
+### 8.1 iOS Input Handling (RESOLVED)
 
-**Status:** Known, accepted, deferred. Will be logged as a GitHub issue when iOS development begins.
+**Status:** Implemented. The `beforeinput` handler is live in `trackChanges.ts`.
 
-**Problem:** The track changes intercept model is built on three ProseMirror hooks:
+**Original problem:** iOS virtual keyboards fire `keydown` with `key: "Unidentified"` for Backspace/Delete, causing the `handleKeyDown` intercept to miss deletions.
 
-| Hook | Desktop (keyboard) | iOS (virtual keyboard) |
-|---|---|---|
-| `handleTextInput` | Works | Works — ProseMirror normalizes text input |
-| `handlePaste` | Works | Works |
-| `handleKeyDown` | Works | **UNRELIABLE** — iOS virtual keyboard does not reliably fire `keydown` events for Backspace/Delete. iOS uses `beforeinput` / `InputEvent` instead. |
+**Solution:** Added `handleDOMEvents.beforeinput` to the TrackChanges plugin. Handles all deletion `inputType`s: `deleteContentBackward`, `deleteContentForward`, `deleteWordBackward/Forward`, `deleteSoftLineBackward/Forward`, `deleteHardLineBackward/Forward`, `deleteByCut`, `deleteByDrag`. Uses `getTargetRanges()` for word/line deletions to leverage browser-native word boundary detection.
 
-**Impact:** On iOS without a hardware keyboard:
-- Typing new text: tracked correctly (via `handleTextInput`)
-- Pasting: tracked correctly (via `handlePaste`)
-- Deleting text: **may not be intercepted** — text could be truly removed instead of marked as a tracked deletion
-- Tab-to-comment: not applicable (no Tab key on virtual keyboard)
-- Substitutions via select-then-type: partially works (the text input is tracked, but the deletion of the selected text may not be)
+**Coexistence with `handleKeyDown`:** On desktop, `handleKeyDown` returns `true` → ProseMirror calls `preventDefault()` → `beforeinput` never fires. On iOS (where `handleKeyDown` returns `false` because `key === "Unidentified"`), `beforeinput` takes over. A 50ms timestamp guard (`_lastDeleteHandledAt`) prevents double-processing in edge cases.
 
-**Scope of impact:** iOS-only. macOS with hardware keyboard is unaffected. macOS with on-screen keyboard is theoretically affected but is an extremely rare use case.
-
-**Mitigation path (when iOS becomes a priority):**
-
-Add a `handleDOMEvents.beforeinput` handler to the TrackChanges plugin that catches `deleteContentBackward`, `deleteContentForward`, and `deleteByDrag` input types. This is the iOS-correct approach for intercepting deletions and is additive — it does not replace or modify the existing `handleKeyDown` logic, which continues to work on desktop.
-
-```typescript
-// Future addition to TrackChanges plugin
-handleDOMEvents: {
-  beforeinput(view, event) {
-    if (!storage.enabled) return false
-    if (event.inputType === 'deleteContentBackward' ||
-        event.inputType === 'deleteContentForward') {
-      // Intercept and apply tracked deletion mark
-      // instead of allowing the default deletion
-    }
-    return false
-  }
-}
-```
-
-**This is a targeted addition to `trackChanges.ts` that does not require refactoring any other code.** It can be implemented when iOS is actively developed without affecting macOS or web targets.
-
-**Acceptance criteria for closing this defect:**
-- All deletion types (single char, range, select-and-type) are correctly intercepted on iOS Safari and iOS Tauri
-- Existing desktop `handleKeyDown` behavior is unchanged
-- Both handlers coexist without double-processing (guard via transaction metadata)
+**Desktop regression verified:** Backspace, Delete, select+delete, select+type (substitution), Option+Backspace (word), and Cmd+Backspace (line) all work identically to pre-change behavior.
 
 ### 8.2 WKWebView Rendering Differences (MONITOR)
 

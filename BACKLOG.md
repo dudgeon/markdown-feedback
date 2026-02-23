@@ -195,6 +195,15 @@ Refinements that improve the feel but aren't blockers.
 
 ---
 
+## Repo Housekeeping
+
+### Root Folder Cleanup
+- [ ] Review and tidy the repo root — assess what's there (config files, stray docs, untracked artifacts, etc.) and decide what to move, rename, or remove
+- [ ] `.docx` test files in root (e.g. `Untitled document (1).docx`, `Welcome to Markdown Feedback.docx`) — move to a `tests/fixtures/` folder or add to `.gitignore` if they shouldn't be tracked
+- [ ] Audit top-level files for anything that should live in `docs/`, be renamed, or be deleted
+
+---
+
 ## Known Issues & Tech Debt
 
 ### Import parser (fixed)
@@ -210,10 +219,9 @@ Refinements that improve the feel but aren't blockers.
 ### Changes panel overflow (fixed)
 - [x] ~~Right-side changes/comment panel viewport area is not locked to the bottom of the screen — panel extends beyond viewport instead of scrolling internally~~ — fixed: switched from page-scrollable layout with `sticky` panel to viewport-locked flex layout (`h-dvh`). Editor and panel scroll independently within their columns.
 
-### iOS input handling (accepted defect — Phase 8)
-- [ ] `handleKeyDown` in TrackChanges plugin does not reliably fire on iOS virtual keyboard for Backspace/Delete. Deletion tracking may silently fail on iOS without a hardware keyboard. Text input and paste are unaffected. macOS and web are unaffected.
-- [ ] **Mitigation:** Add `handleDOMEvents.beforeinput` handler to catch `deleteContentBackward`/`deleteContentForward` input types. This is additive — does not modify existing `handleKeyDown` logic. Deferred until iOS target is actively developed.
-- [ ] Full analysis: `docs/desktop-app.md` §8.1
+### iOS input handling (fixed)
+- [x] ~~`handleKeyDown` in TrackChanges plugin does not reliably fire on iOS virtual keyboard for Backspace/Delete~~ — fixed: added `handleDOMEvents.beforeinput` handler that catches all deletion `inputType`s (`deleteContentBackward`, `deleteContentForward`, word/line/cut/drag deletions). On desktop, `handleKeyDown` returns `true` → `preventDefault()` stops `beforeinput` from firing. On iOS (where `keydown` fires with `key: "Unidentified"`), `handleKeyDown` returns `false` and `beforeinput` takes over. A 50ms timestamp guard prevents double-processing edge cases.
+- [x] Full analysis: `docs/desktop-app.md` §8.1, `docs/ios-app.md` §4
 
 ### Serialization edge cases
 - [ ] Substitution over text that already contains old deletions — old deletions emit as standalone `{--…--}` outside the `{~~…~~}`, which is semantically correct but may look odd
@@ -297,7 +305,7 @@ Refinements that improve the feel but aren't blockers.
 - [ ] **VSCode extension** — Phase 9 (see above; builds before Tauri)
 - [ ] **macOS / Mac App Store** — Phase 8D–G (see above; after VSCode)
 - [ ] **Android** — Tauri 2 supports Android; same `beforeinput` fix required as iOS; lower priority
-- [ ] **iOS** — Tauri 2 supports iOS; requires resolving iOS input handling defect first (see Known Issues); currently infeasible due to virtual keyboard `keydown` unreliability
+- [ ] **iOS** — Tauri 2 (shared `src-tauri/` with macOS); requires `beforeinput` handler + Phase 8D first. Full spec: `docs/ios-app.md`
 - [ ] **Windows / Linux** — Tauri cross-platform via GitHub Actions CI; non-priority
 - [ ] Obsidian plugin (native integration into knowledge management ecosystem)
 - [ ] Export to Google Docs (CriticMarkup → `.docx` with Word track changes)

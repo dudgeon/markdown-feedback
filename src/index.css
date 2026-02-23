@@ -13,6 +13,7 @@ body {
   outline: none;
   min-height: 300px;
   padding: 1rem;
+  overscroll-behavior: none;
 }
 
 .tiptap p {
