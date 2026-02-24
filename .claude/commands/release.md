@@ -1,11 +1,21 @@
 ---
-description: Create a GitHub release with changelog, tag, and single-file HTML build
+description: Create a GitHub release with changelog, tag, single-file HTML build, and VSCode .vsix
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, AskUserQuestion, TodoWrite
 ---
 
 # Release
 
-Create a versioned release of Markdown Feedback. This command discovers unreleased changes, writes a changelog, builds the single-file HTML, tags the release, and publishes it on GitHub with the HTML attached.
+Create a versioned release of Markdown Feedback. This command discovers unreleased changes, writes a changelog, builds all release artifacts, tags the release, and publishes it on GitHub with all artifacts attached.
+
+## Pre-flight: artifact registry check
+
+Before doing anything else, read the **Release artifact registry** table in `CLAUDE.md`. Confirm that the list of artifacts and their build commands is still accurate. If a new build target was added since the last release but the registry wasn't updated, stop and update `CLAUDE.md` first.
+
+Current expected artifacts (as of last update):
+- `dist-single/index.html` — built by `npm run build:single`
+- `extension/markdown-feedback-<version>.vsix` — built by `npm run package:vscode`
+
+If this list doesn't match `CLAUDE.md`, trust `CLAUDE.md` and proceed with whatever is listed there.
 
 ## Environment
 
@@ -73,14 +83,24 @@ Once the user confirms:
 
 ### 3b. Update package.json version
 
-Change the `"version"` field to the new version (without the `v` prefix).
+Change the `"version"` field to the new version (without the `v` prefix) in **both**:
+- `package.json` (root)
+- `extension/package.json` (VSCode extension manifest — controls the `.vsix` filename)
 
 ### 3c. Build
 
-Run both builds and confirm they succeed:
+Run all builds and confirm they succeed:
 ```
 npm run build:single
 npm run build
+npm run package:vscode
+```
+
+`package:vscode` builds the VSCode webview + extension host and runs `vsce package`, producing `extension/markdown-feedback-<version>.vsix`. The extension `version` in `extension/package.json` must match the release version — update it alongside the root `package.json` in step 3b.
+
+After building, locate the `.vsix`:
+```
+ls extension/*.vsix
 ```
 
 ### 3d. Commit
@@ -100,12 +120,14 @@ git push origin main --tags
 
 ### 3f. Create GitHub release
 
-Create the release with the single-file HTML attached:
+Create the release with both the single-file HTML and the VSCode extension attached:
 ```
-gh release create vX.Y.Z dist-single/index.html \
+gh release create vX.Y.Z dist-single/index.html extension/markdown-feedback-X.Y.Z.vsix \
   --title "vX.Y.Z" \
   --notes "$(changelog section for this version)"
 ```
+
+Use the actual `.vsix` filename from step 3c (e.g. `extension/markdown-feedback-1.3.0.vsix`).
 
 Use the changelog section content (the grouped changes, not the full file) as the release notes.
 

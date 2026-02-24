@@ -28,10 +28,19 @@ Use the `/release` slash command to create a new release. It handles the full li
 1. Discovers unreleased commits since the last tag
 2. Summarizes changes and suggests a version
 3. Creates/updates CHANGELOG.md
-4. Builds the single-file HTML (`npm run build:single`)
-5. Commits, tags, pushes, and creates a GitHub release with `dist-single/index.html` attached
+4. Builds all artifacts: `npm run build:single` (web app) + `npm run package:vscode` (VSCode extension)
+5. Commits, tags, pushes, and creates a GitHub release with **both** `dist-single/index.html` and `extension/markdown-feedback-X.Y.Z.vsix` attached
 
-Release history lives in `CHANGELOG.md`. Each GitHub release has the single-file HTML attached so users behind firewalls can download it directly.
+Release history lives in `CHANGELOG.md`. Each GitHub release has both artifacts attached so users can download either.
+
+### Release artifact registry
+
+This is the canonical list of artifacts that must be attached to every release. Update it whenever a new build target is added to the project — do not mark a phase complete without doing this.
+
+| Artifact | Build command | Output path |
+|---|---|---|
+| Web app (single-file HTML) | `npm run build:single` | `dist-single/index.html` |
+| VSCode extension | `npm run package:vscode` | `extension/markdown-feedback-<version>.vsix` |
 
 ## Tech Stack
 
@@ -193,6 +202,22 @@ extension/                 # VSCode extension host (Phase 9A — not yet created
 - Keep `BACKLOG.md` as the single source of truth for what's planned, in progress, and done
 
 ## Rules
+
+### Phase Completion Requires Process Audit
+
+"Done" means the feature works **and** all downstream processes reflect the new reality. Before marking any phase or significant feature complete, ask:
+
+> "What existing processes, docs, or config assume the old project structure — and are now stale?"
+
+Check each category:
+- **Release process** (`CLAUDE.md` artifact registry + `.claude/commands/release.md`) — new build artifact? new output path? update both.
+- **CI/CD** (`.github/workflows/`) — new build step, new env var, new test suite? update workflows.
+- **README** — new install step, new command, new download artifact? update the user-facing docs.
+- **CLAUDE.md Commands section** — new `npm run` script added? add it to the commands table.
+- **About panel** (`src/components/AboutPanel.tsx`) — new keyboard shortcut or user-facing feature? update the in-app reference.
+- **Spec docs** (`docs/`) — does the spec describe the old architecture? note what changed.
+
+This audit is not optional. A phase that adds a build artifact but doesn't update the release process is not complete — it has deferred a failure to the next release.
 
 ### No Destructive Scaffolding
 
