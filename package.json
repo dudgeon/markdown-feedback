@@ -13,7 +13,10 @@
     "build:vscode:webview": "tsc -b && vite build --config vite.config.vscode.ts",
     "build:vscode:host": "esbuild extension/src/extension.ts --bundle --outfile=extension/dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap",
     "build:vscode": "npm run build:vscode:webview && npm run build:vscode:host",
-    "package:vscode": "npm run build:vscode && cd extension && npx vsce package"
+    "package:vscode": "npm run build:vscode && cd extension && npx vsce package",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build"
   },
   "dependencies": {
     "@tiptap/pm": "^3.19.0",
@@ -41,6 +44,7 @@
     "typescript-eslint": "^8.46.4",
     "vite": "^7.2.4",
     "vite-plugin-singlefile": "^2.3.0",
-    "esbuild": "^0.25.0"
+    "esbuild": "^0.25.0",
+    "@tauri-apps/cli": "^2"
   }
 }

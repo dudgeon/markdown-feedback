@@ -20,6 +20,10 @@ extension/dist
 extension/media
 *.vsix
 
+# Tauri / Rust build artifacts
+src-tauri/target/
+src-tauri/gen/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

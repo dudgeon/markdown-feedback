@@ -287,6 +287,11 @@ Refinements that improve the feel but aren't blockers.
 - [x] Include: Cmd+Shift+T (toggle tracking), Cmd+Shift+H (highlight), Tab (jump to comment input when on a change), Enter/Tab in comment input (save/return to editor)
 - [x] Keep in sync as new shortcuts are added
 
+### UI Toolbar Refactor (VSCode Compatibility)
+- [ ] Extract editor controls that are relevant across all platforms (track changes on/off, font selector, markdown decorations on/off) into a shared `EditorControls` component
+- [ ] Isolate web-only controls (Import, Export) so they are excluded from the VSCode WebView toolbar — VSCode has its own file I/O and these buttons are meaningless inside the extension
+- [ ] Ensure the shared controls work identically in web, VSCode, and future Tauri targets via the platform adapter's `capabilities` flags
+
 ### Accept / Reject
 - [ ] Accept/reject individual changes to produce a clean document
 - [ ] Accept all / Reject all bulk operations

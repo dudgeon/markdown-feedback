@@ -1,5 +1,6 @@
 import { createWebPersistence } from './web'
 import { createVSCodePersistence } from './vscode'
+import { createTauriPersistence } from './tauri'
 import type { PlatformAdapter } from './types'
 
 export type { PlatformAdapter, PlatformCapabilities, SavedSession } from './types'
@@ -13,10 +14,9 @@ export function createPersistence(): PlatformAdapter {
   }
 
   // Tauri native app: window.__TAURI__ is set by the Tauri runtime
-  // if (typeof window !== 'undefined' && '__TAURI__' in window) {
-  //   const { createTauriPersistence } = await import('./tauri')
-  //   return createTauriPersistence()
-  // }
+  if (typeof window !== 'undefined' && '__TAURI__' in window) {
+    return createTauriPersistence()
+  }
 
   return createWebPersistence()
 }
