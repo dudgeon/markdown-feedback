@@ -1,6 +1,6 @@
 # Desktop App — Specification
 
-**Status:** Research complete, ready for implementation
+**Status:** Phase 8D (Tauri shell) COMPLETE — app compiles and opens in native macOS window. WKWebView manual testing pending. Next: Phase 8E (native file operations).
 **Author:** Geoff + Claude
 **Date:** 2026-02-15
 **Framework:** Tauri 2
@@ -637,19 +637,39 @@ Build iteratively. Each phase is independently shippable on the web target. No p
 
 **Verification:** Toggle off → type/delete → text changes normally (no marks). Toggle on → edits are tracked as before. Existing tracked changes remain visible in both modes.
 
-### Phase 3: Tauri Shell
+### Phase 3: Tauri Shell ✅
 
 **Goal:** Wrap the web app in a native macOS window.
 
-**Deliverables:**
-- `src-tauri/` directory with Tauri 2 boilerplate
-- `tauri.conf.json` pointing at Vite dev server and `dist/` output
-- Vite config additions (`clearScreen: false`, `server.strictPort`, ignore `src-tauri/` in watcher)
-- `npm run tauri:dev` and `npm run tauri:build` scripts
-- App opens in a native window with the existing web UI
-- Verify: editor works identically in the Tauri window (type, delete, substitute, comment, import, export)
+**Status:** COMPLETE (2026-02-28). App compiles and launches. Manual WKWebView verification pending.
 
-**This phase produces a working app but with no native features yet — just the web app in a window.** The purpose is to validate the Tauri setup and WKWebView compatibility before adding native integration.
+**What was built:**
+- `src-tauri/` directory with Tauri 2 boilerplate (`Cargo.toml`, `lib.rs`, `main.rs`, `build.rs`)
+- `tauri.conf.json` — `devUrl: localhost:5173`, `frontendDist: ../dist`, window 1200x800, identifier `com.markdownfeedback.app`
+- `src-tauri/capabilities/default.json` — `core:default` permissions only (plugins deferred to Phase 4)
+- Placeholder icons generated via `npx tauri icon` (teal solid color)
+- `vite.config.ts` — conditional Tauri settings (`clearScreen`, `strictPort`, `watch.ignored`, `build.target: safari13`), no-op for web builds
+- `src/stores/persistence/tauri.ts` — minimal adapter using localStorage (identical to web adapter), `__TAURI__` detection enabled in `index.ts`
+- `@tauri-apps/cli` devDependency, `npm run tauri:dev` / `tauri:build` scripts
+- `.gitignore` — `src-tauri/target/`, `src-tauri/gen/`
+
+**What was verified:**
+- `npm run tauri:dev` compiles Rust and opens native macOS window
+- `npm run build` (web) unaffected
+- `npm run build:vscode` unaffected
+
+**What still needs manual testing:**
+- Full editor behavior in WKWebView (type, delete, substitute, comment, highlight, import, export, undo)
+- `beforeinput` handler on macOS (should work — hardware keyboard fires `keydown` normally)
+- Dynamic `import()` for JSZip (.docx import)
+- `navigator.clipboard` API
+- Google Fonts loading (Literata toggle)
+
+**Design decisions:**
+- Tauri adapter is a localStorage stub for Phase 3. No `@tauri-apps/api` dependency. Real plugin integrations in Phase 4.
+- Static import of `tauri.ts` (not dynamic) — acceptable since the stub has no Tauri-specific imports. Convert to dynamic import in Phase 4.
+- `build.target: safari13` for WKWebView compatibility. May need raising to `safari15` if ES2020+ features cause issues.
+- `crate-type` includes `staticlib`/`cdylib` for future iOS target (shared `src-tauri/`).
 
 ### Phase 4: Native File Operations
 

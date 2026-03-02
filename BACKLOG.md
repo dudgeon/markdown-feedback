@@ -110,7 +110,7 @@ Platform adapter hardening, then native macOS app via Tauri 2. Full spec: `docs/
 - [x] **Phase A:** State management extraction — moved document state from Editor.tsx into Zustand store (`documentStore.ts`). Abstract persistence layer (`stores/persistence/`). Web app behavior unchanged.
 - [x] **Phase B:** Track changes toggle — module-level `_trackingEnabled` flag, all three handlers check flag and passthrough when disabled. Toolbar toggle pill + Cmd+Shift+T shortcut. `appendTransaction` strips inclusive insertion marks from untracked text. Keyboard shortcuts section added to About panel. Ships on web.
 - [x] **Phase C:** Platform adapter hardening — expand `PlatformAdapter` interface beyond persistence to cover file I/O (`openFile`, `saveFile`, `getCurrentFilePath`), platform signals (`setDirty`, `onExternalFileChange`), and a `capabilities` flag object for conditional UI. Web adapter satisfies all optional fields with no-ops. No user-visible change — prerequisite refactor for all native targets. *(Do before Phase 9 VSCode and before Phase 8D Tauri.)*
-- [ ] **Phase D:** Tauri shell — `src-tauri/` boilerplate, `tauri.conf.json` pointing at Vite, verify editor works in WKWebView. No native features yet — just the web app in a native window. *(Do after Phase 9A VSCode — VSCode validates the app works in a non-browser WebView first.)*
+- [x] **Phase D:** Tauri shell — `src-tauri/` boilerplate with Tauri 2, `tauri.conf.json` pointing at Vite, minimal Tauri platform adapter (`stores/persistence/tauri.ts`, localStorage-based stub), placeholder icons, `npm run tauri:dev` / `tauri:build` scripts. Vite config updated with conditional Tauri server settings. App compiles and opens in native macOS window. **Not yet manually verified:** full editor behavior in WKWebView (type, delete, substitute, comment, import/export) — compile-tested only.
 - [ ] **Phase E:** Native file operations — Open/Save/SaveAs via `@tauri-apps/plugin-dialog` + `@tauri-apps/plugin-fs`. Native menu bar (File/Edit/View). Dirty state in title bar. File associations for `.md` and `.docx`. Cmd+S saves to disk.
 - [ ] **Phase F:** Mac App Store preparation — sandbox entitlements, universal binary, code signing, notarization, GitHub Actions CI for macOS build, DMG for direct distribution. *(Requires Apple Developer Program membership.)*
 - [ ] **Phase G:** Polish — Recent Files menu, Edit menu integration, window state persistence, auto-update via Tauri updater plugin.
@@ -121,7 +121,8 @@ Platform adapter hardening, then native macOS app via Tauri 2. Full spec: `docs/
 - State extraction (Phase A) is the prerequisite refactor — avoids cementing Editor.tsx as a God component before adding file path, dirty state, and tracking toggle.
 - Track changes toggle (Phase B) uses a module-level variable in `trackChanges.ts` (not TipTap extension storage, which resets on `useEditor` re-render). Text typed with tracking off becomes indistinguishable from "original" text (intentional, matches Word/Google Docs behavior).
 - Save format is CriticMarkup with YAML frontmatter (same as current export). Round-trip safe.
-- **Known defect (accepted):** iOS virtual keyboard does not reliably fire `keydown` for Backspace/Delete. Deletion tracking may not work on iOS without a hardware keyboard. Mitigation: add `handleDOMEvents.beforeinput` handler when iOS target is actively developed. Does not affect macOS or web. See spec §8.1 for full analysis.
+- ~~**Known defect (accepted):** iOS virtual keyboard does not reliably fire `keydown` for Backspace/Delete.~~ Fixed: `beforeinput` handler implemented in `trackChanges.ts` (handles all deletion inputTypes with 50ms timestamp guard). See `docs/ios-app.md` §4.
+- **Phase 8D note:** The Tauri adapter is a localStorage stub identical to the web adapter. Real Tauri plugin integrations (`@tauri-apps/plugin-fs`, `@tauri-apps/plugin-dialog`) are deferred to Phase 8E. Detection uses runtime check (`'__TAURI__' in window`) in `stores/persistence/index.ts`.
 
 ---
 
@@ -261,8 +262,16 @@ Refinements that improve the feel but aren't blockers.
 - [ ] Paragraph-level deletions (CriticMarkup can't span paragraph boundaries)
 - [ ] Paste handling: strip formatting vs. preserve markdown-compatible formatting
 - [ ] Merge paragraphs (delete line break between them) — tracked change semantics
-- [ ] Full markdown rendering in editor (headings, bold, italic, lists, code, links, blockquotes)
-- [ ] Markdown ↔ rich text round-trip fidelity
+- [ ] Rich markdown decorations — see dedicated item below
+
+### Rich Markdown Decorations
+Render markdown syntax as styled content in the editor (headings sized/bolded, bold/italic rendered, links clickable, code blocks styled, blockquotes indented, etc.) while preserving the underlying markdown source. Currently the editor treats everything as plain text with only track-change marks.
+
+- [ ] Evaluate library options: TipTap's built-in nodes/marks (Heading, Bold, Italic, Code, Link, Blockquote, etc.) vs. a markdown-aware TipTap kit like `tiptap-markdown` or `@tiptap/extension-typography`
+- [ ] Ensure markdown decorations coexist with tracked change marks — decorations are orthogonal to insertions/deletions and must not interfere with the intercept model
+- [ ] Add a toggle (on/off) so users can switch between decorated and plain-text views — this toggle is one of the shared editor controls needed across all platforms (see UI Toolbar Refactor item)
+- [ ] Round-trip fidelity: the underlying markdown source must survive decoration → serialization without mutation (no lossy conversion from rich nodes back to markdown)
+- [ ] Handle edge cases: tracked deletion inside a heading, insertion spanning a bold boundary, highlight over a code span, etc.
 
 ### Source View Actions
 - [ ] Paste-to-replace button: replace editor content with clipboard contents (no tracked deletions — rebaselines the document)
@@ -286,6 +295,13 @@ Refinements that improve the feel but aren't blockers.
 - [x] Add a "Keyboard Shortcuts" section to the About panel listing all user-facing shortcuts
 - [x] Include: Cmd+Shift+T (toggle tracking), Cmd+Shift+H (highlight), Tab (jump to comment input when on a change), Enter/Tab in comment input (save/return to editor)
 - [x] Keep in sync as new shortcuts are added
+
+### Empty Editor Default + Placeholder Text
+- [ ] Remove hardcoded sample/dummy content — editor should start blank by default on all platforms
+- [ ] **Web browser:** if a localStorage session exists, offer to restore it (existing RecoveryModal flow); otherwise start blank
+- [ ] **VSCode:** editor loads the document selected via "Open With" (existing `loadDocument` flow); no sample content needed
+- [ ] When the editor is empty, show faint placeholder text (e.g. "Click here to begin writing") — use TipTap's `placeholder` extension or a CSS `:empty::before` pseudo-element
+- [ ] Placeholder disappears as soon as the user types or imports content
 
 ### UI Toolbar Refactor (VSCode Compatibility)
 - [ ] Extract editor controls that are relevant across all platforms (track changes on/off, font selector, markdown decorations on/off) into a shared `EditorControls` component

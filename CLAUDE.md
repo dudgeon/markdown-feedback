@@ -10,7 +10,7 @@ Full specification lives in `docs/prd.md` and `docs/project-context.md`. Roadmap
 
 **Live:** https://markdown-feedback.com
 
-**Status:** Phase 9A+B COMPLETE (VSCode extension — CriticMarkup inline + sidecar modes). Next: Phase 8D (Tauri macOS shell). Phase 7E (DOCX polish) partial. See BACKLOG.md for details.
+**Status:** Phase 8D COMPLETE (Tauri macOS shell — app compiles and opens in native window; WKWebView manual testing pending). Phase 9A+B also complete (VSCode extension). Next: Phase 8E (native file operations) or manual WKWebView verification. Phase 7E (DOCX polish) partial. See BACKLOG.md for details.
 
 ## Commands
 
@@ -20,6 +20,8 @@ npm run build          # TypeScript check + Vite production build
 npm run build:single   # Single self-contained HTML file (output: dist-single/index.html)
 npm run lint           # ESLint (flat config, TS + React)
 npm run preview        # Preview production build locally
+npm run tauri:dev      # Launch Tauri macOS app (requires Rust toolchain)
+npm run tauri:build    # Production Tauri build (.app + DMG)
 ```
 
 ## Releases
@@ -178,10 +180,17 @@ src/                       # Application source code
   hooks/                   # Custom React hooks
   utils/                   # Pure utility functions
   stores/persistence/      # Platform adapter (web.ts, vscode.ts Phase 9A, tauri.ts Phase 8D)
-extension/                 # VSCode extension host (Phase 9A — not yet created)
+extension/                 # VSCode extension host (Phase 9A)
   package.json             # VS Code manifest (contributes.customEditors)
   src/extension.ts         # Extension entry point
   src/editorProvider.ts    # CustomTextEditorProvider
+src-tauri/                 # Tauri 2 native shell (Phase 8D)
+  Cargo.toml               # Rust manifest (tauri 2, serde)
+  tauri.conf.json          # Tauri config (devUrl, frontendDist, window, bundle)
+  src/lib.rs               # App entry point (mobile_entry_point attr for iOS)
+  src/main.rs              # Desktop main
+  capabilities/            # Tauri 2 permission declarations
+  icons/                   # App icons (all platforms, generated via `npx tauri icon`)
 .claude/commands/          # Custom slash commands
   release.md               # /release — changelog, tag, build, publish
 .github/workflows/         # CI/CD (GitHub Pages deployment)
@@ -253,6 +262,19 @@ Full spec: `docs/vscode-extension.md`. Key points for implementation:
 - **Keyboard conflict:** `Cmd+Shift+T` is intercepted by VS Code (reopen closed tab). Track changes toggle shortcut needs remapping for VSCode target — audit during 9A.
 - **Build:** `vite.config.vscode.ts` → `dist-vscode/` (base `'./'`). Extension host: esbuild → `extension/dist/`. Package: `vsce package` → `.vsix`.
 
+## Tauri Desktop App (Phase 8D+)
+
+Full spec: `docs/desktop-app.md`. iOS spec: `docs/ios-app.md`. Key points:
+
+- **Tauri 2** — native macOS window wrapping the existing Vite/React app. WKWebView engine (same as Safari). Shares `src-tauri/` with future iOS target.
+- **Tauri adapter** (`src/stores/persistence/tauri.ts`) — Phase 8D stub uses localStorage (identical to web adapter). Phase 8E will replace with `@tauri-apps/plugin-fs` and `@tauri-apps/plugin-dialog` for native file I/O.
+- **Runtime detection:** `'__TAURI__' in window` in `stores/persistence/index.ts`. Static import (not dynamic) — acceptable for Phase 8D since the adapter has no Tauri-specific imports. Convert to dynamic import in Phase 8E when `@tauri-apps/api` is added.
+- **Vite integration:** `vite.config.ts` has conditional settings keyed on `TAURI_ENV_*` env vars (`clearScreen: false`, `strictPort`, `build.target: safari13`). No-op for web builds.
+- **Build:** `npm run tauri:dev` (dev, requires Rust), `npm run tauri:build` (production .app + DMG). Web builds (`npm run dev`, `npm run build`) are unaffected.
+- **Rust toolchain required:** Install via `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`. First compile downloads ~380 crates (~2-5 min); incremental builds are ~5s.
+- **Icons:** Placeholder teal icons generated via `npx tauri icon`. Replace with real icon before any public release.
+- **Phase 8D status:** Compiles and launches. Manual WKWebView behavior verification (track changes, import/export, comments) not yet done.
+
 ## Relevant Skills for This Build
 
 - **ProseMirror internals** — marks, schema, transactions, plugins, step mapping
@@ -261,3 +283,4 @@ Full spec: `docs/vscode-extension.md`. Key points for implementation:
 - **CriticMarkup spec** — http://criticmarkup.com/spec.php
 - **Obsidian CriticMarkup plugin** — https://github.com/Fevol/obsidian-criticmarkup (compatibility target)
 - **VS Code extension API** — `CustomTextEditorProvider`, `WebviewPanel`, `TextDocument`, `WorkspaceEdit`, `postMessage`
+- **Tauri 2** — `tauri.conf.json`, Rust `tauri::Builder`, WKWebView on macOS/iOS, `@tauri-apps/plugin-fs`, `@tauri-apps/plugin-dialog`
