@@ -49,11 +49,18 @@ export function extractChanges(
 ): ChangeEntry[] {
   const changes: ChangeEntry[] = []
 
-  doc.forEach((blockNode, blockOffset) => {
-    const basePos = blockOffset + 1 // +1 for the block node's opening tag
-    const segments = collectPositionedSegments(blockNode, basePos)
-    const blockChanges = groupSegmentsIntoChanges(segments)
-    changes.push(...blockChanges)
+  // Use descendants to recursively find all textblock nodes (paragraphs, headings)
+  // inside any wrapper structure (lists, blockquotes, etc.).
+  // This handles bulletList > listItem > paragraph nesting automatically.
+  doc.descendants((node, pos) => {
+    if (node.isTextblock) {
+      const basePos = pos + 1 // +1 for the node's opening tag
+      const segments = collectPositionedSegments(node, basePos)
+      const blockChanges = groupSegmentsIntoChanges(segments)
+      changes.push(...blockChanges)
+      return false // don't descend into this textblock's children
+    }
+    return true // keep descending into wrapper nodes
   })
 
   // Merge consecutive highlight entries with the same ID across block boundaries.

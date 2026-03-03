@@ -27,13 +27,75 @@ export function serializeCriticMarkup(
   const blocks: string[] = []
 
   doc.forEach((blockNode) => {
-    const prefix = getBlockPrefix(blockNode)
-    const segments = collectSegments(blockNode)
-    const markup = serializeSegments(segments, comments)
-    blocks.push(prefix + markup)
+    blocks.push(serializeNode(blockNode, comments, ''))
   })
 
   return blocks.join('\n\n')
+}
+
+/** Recursively serialize a block node into markdown + CriticMarkup. */
+function serializeNode(
+  node: ProseMirrorNode,
+  comments: Record<string, CommentThread[]>,
+  indent: string
+): string {
+  const typeName = node.type.name
+
+  if (typeName === 'bulletList') {
+    const items: string[] = []
+    node.forEach((listItem) => {
+      items.push(serializeListItem(listItem, comments, indent, '- '))
+    })
+    return items.join('\n')
+  }
+
+  if (typeName === 'orderedList') {
+    const items: string[] = []
+    let num = (node.attrs.start as number) ?? 1
+    node.forEach((listItem) => {
+      const prefix = `${num}. `
+      items.push(serializeListItem(listItem, comments, indent, prefix))
+      num++
+    })
+    return items.join('\n')
+  }
+
+  // Textblock (paragraph, heading, etc.) — has inline content
+  const prefix = getBlockPrefix(node)
+  const segments = collectSegments(node)
+  const markup = serializeSegments(segments, comments)
+  return indent + prefix + markup
+}
+
+/** Serialize a single list item, which may contain paragraphs and nested lists. */
+function serializeListItem(
+  listItem: ProseMirrorNode,
+  comments: Record<string, CommentThread[]>,
+  indent: string,
+  marker: string
+): string {
+  const lines: string[] = []
+  let isFirst = true
+
+  listItem.forEach((child) => {
+    const childType = child.type.name
+    if (childType === 'bulletList' || childType === 'orderedList') {
+      // Nested list — indent under the parent marker
+      lines.push(serializeNode(child, comments, indent + '  '))
+    } else {
+      const segments = collectSegments(child)
+      const markup = serializeSegments(segments, comments)
+      if (isFirst) {
+        lines.push(indent + marker + markup)
+      } else {
+        // Continuation paragraph — indent to align with first line content
+        lines.push(indent + ' '.repeat(marker.length) + markup)
+      }
+    }
+    isFirst = false
+  })
+
+  return lines.join('\n')
 }
 
 /** Collect inline text segments with their mark metadata from a block node. */
