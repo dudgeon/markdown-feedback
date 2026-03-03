@@ -10,7 +10,7 @@ Full specification lives in `docs/prd.md` and `docs/project-context.md`. Roadmap
 
 **Live:** https://markdown-feedback.com
 
-**Status:** Phase 8D COMPLETE (Tauri macOS shell — app compiles and opens in native window; WKWebView manual testing pending). Phase 9A+B also complete (VSCode extension). Next: Phase 8E (native file operations) or manual WKWebView verification. Phase 7E (DOCX polish) partial. See BACKLOG.md for details.
+**Status:** Phase 10A COMPLETE (empty editor default + placeholder text). Phase 8D, 9A+B also complete. Next: Phase 10B (UI toolbar refactor), then 10C+D (rich markdown decorations), then resume Phase 8E (Tauri native file ops). Phase 7E (DOCX polish) partial. See BACKLOG.md for details.
 
 ## Commands
 
