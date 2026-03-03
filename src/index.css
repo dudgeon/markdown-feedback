@@ -16,6 +16,15 @@ body {
   overscroll-behavior: none;
 }
 
+/* Placeholder text when editor is empty */
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #9ca3af;
+  pointer-events: none;
+  height: 0;
+}
+
 .tiptap p {
   margin: 0.5em 0;
 }

@@ -85,6 +85,18 @@
 
 ## Up Next
 
+### Phase 10: Editor UX Hardening
+Small UI improvements that benefit all platforms (web, VSCode, Tauri) before resuming native app work. Removes assumptions baked in from early prototyping (sample content, monolithic toolbar) and lays groundwork for rich markdown rendering.
+
+**Execution order note:** 10A → 10B → 10C → 10D is a dependency chain. 10A removes sample content (prerequisite for toolbar refactor). 10B separates shared vs. web-only controls (creates the slot for the decorations toggle). 10C is a research spike to derisk 10D. Phase 7E (DOCX polish) can be picked up opportunistically at any point.
+
+- [ ] **Phase A:** Empty editor default + placeholder text — remove hardcoded sample content; editor starts blank on all platforms. Web: recover from localStorage if session exists (existing RecoveryModal), otherwise blank. VSCode: loads opened document (existing `loadDocument`). Empty editor shows faint placeholder (e.g. "Click here to begin writing") via TipTap `placeholder` extension or CSS `:empty::before`. Placeholder disappears on first input or import.
+- [ ] **Phase B:** UI toolbar refactor — extract shared editor controls (track changes on/off, font selector, markdown decorations on/off) into an `EditorControls` component. Isolate web-only controls (Import, Export) so they are excluded from the VSCode WebView toolbar. Use platform adapter `capabilities` flags for conditional rendering. Markdown decorations toggle is a placeholder/no-op until 10D.
+- [ ] **Phase C:** Rich markdown decorations spike — time-boxed research. Evaluate TipTap's built-in StarterKit nodes/marks vs. `tiptap-markdown` vs. other approaches. Build a proof-of-concept for tracked-change marks coexisting with decoration nodes (e.g. tracked deletion inside a heading, insertion spanning a bold boundary). Produce a recommendation doc and confirm round-trip serialization fidelity.
+- [ ] **Phase D:** Rich markdown decorations (implement) — render markdown syntax as styled content (headings, bold, italic, links, code, blockquotes) while preserving the underlying source. Toggle on/off via the shared control from 10B. Must not interfere with the intercept model. Round-trip safe.
+
+---
+
 ### Phase 7: DOCX Import (Google Docs → CriticMarkup)
 Import a `.docx` file exported from Google Docs (with Suggesting mode edits) and reconstruct all tracked changes and comments as CriticMarkup. All processing client-side — JSZip + browser-native DOMParser. Full spec: `docs/docx-import.md`.
 
@@ -92,7 +104,7 @@ Import a `.docx` file exported from Google Docs (with Suggesting mode edits) and
 - [x] **Phase B:** Tracked changes → CriticMarkup (`{++…++}`, `{--…--}`, `{~~…~~}`)
 - [x] **Phase C:** Comments extraction from `word/comments.xml` → `{>>…<<}`
 - [x] **Phase D:** Comment-to-change attribution (comment on suggestion vs. comment on plain text)
-- [ ] **Phase E:** Polish — ~~lists,~~ moves, hyperlinks, edge cases, lazy loading
+- [ ] **Phase E:** Polish — ~~lists,~~ moves, hyperlinks, edge cases, lazy loading *(pick up opportunistically)*
 
 **Phase 7 design decisions:**
 - Output is a CriticMarkup markdown string — same format as paste import. Entire existing pipeline (`criticMarkupToHTML` → `setContent`) works unchanged.
@@ -105,13 +117,13 @@ Import a `.docx` file exported from Google Docs (with Suggesting mode edits) and
 ### Phase 8: Multi-Platform Foundation + macOS App
 Platform adapter hardening, then native macOS app via Tauri 2. Full spec: `docs/desktop-app.md`.
 
-**Execution order note:** Phase 8C (adapter hardening) is a prerequisite for all native targets. Phase 9 (VSCode extension) is built before Phase 8D–G (Tauri) because: VSCode requires no native toolchain, uses Chromium (same engine as web app), and validates the platform adapter pattern before tackling WKWebView compatibility. See Phase 9 below.
+**Execution order note:** Phases 8A–D and 9A–B are complete. Phase 10 (editor UX hardening) is done before resuming 8E because the toolbar refactor and empty-editor default improve the shared app that all native targets embed — better to get the UI right before wiring up native file operations.
 
 - [x] **Phase A:** State management extraction — moved document state from Editor.tsx into Zustand store (`documentStore.ts`). Abstract persistence layer (`stores/persistence/`). Web app behavior unchanged.
 - [x] **Phase B:** Track changes toggle — module-level `_trackingEnabled` flag, all three handlers check flag and passthrough when disabled. Toolbar toggle pill + Cmd+Shift+T shortcut. `appendTransaction` strips inclusive insertion marks from untracked text. Keyboard shortcuts section added to About panel. Ships on web.
 - [x] **Phase C:** Platform adapter hardening — expand `PlatformAdapter` interface beyond persistence to cover file I/O (`openFile`, `saveFile`, `getCurrentFilePath`), platform signals (`setDirty`, `onExternalFileChange`), and a `capabilities` flag object for conditional UI. Web adapter satisfies all optional fields with no-ops. No user-visible change — prerequisite refactor for all native targets. *(Do before Phase 9 VSCode and before Phase 8D Tauri.)*
 - [x] **Phase D:** Tauri shell — `src-tauri/` boilerplate with Tauri 2, `tauri.conf.json` pointing at Vite, minimal Tauri platform adapter (`stores/persistence/tauri.ts`, localStorage-based stub), placeholder icons, `npm run tauri:dev` / `tauri:build` scripts. Vite config updated with conditional Tauri server settings. App compiles and opens in native macOS window. **Not yet manually verified:** full editor behavior in WKWebView (type, delete, substitute, comment, import/export) — compile-tested only.
-- [ ] **Phase E:** Native file operations — Open/Save/SaveAs via `@tauri-apps/plugin-dialog` + `@tauri-apps/plugin-fs`. Native menu bar (File/Edit/View). Dirty state in title bar. File associations for `.md` and `.docx`. Cmd+S saves to disk.
+- [ ] **Phase E:** Native file operations — Open/Save/SaveAs via `@tauri-apps/plugin-dialog` + `@tauri-apps/plugin-fs`. Native menu bar (File/Edit/View). Dirty state in title bar. File associations for `.md` and `.docx`. Cmd+S saves to disk. *(Resume after Phase 10.)*
 - [ ] **Phase F:** Mac App Store preparation — sandbox entitlements, universal binary, code signing, notarization, GitHub Actions CI for macOS build, DMG for direct distribution. *(Requires Apple Developer Program membership.)*
 - [ ] **Phase G:** Polish — Recent Files menu, Edit menu integration, window state persistence, auto-update via Tauri updater plugin.
 
@@ -262,16 +274,7 @@ Refinements that improve the feel but aren't blockers.
 - [ ] Paragraph-level deletions (CriticMarkup can't span paragraph boundaries)
 - [ ] Paste handling: strip formatting vs. preserve markdown-compatible formatting
 - [ ] Merge paragraphs (delete line break between them) — tracked change semantics
-- [ ] Rich markdown decorations — see dedicated item below
-
-### Rich Markdown Decorations
-Render markdown syntax as styled content in the editor (headings sized/bolded, bold/italic rendered, links clickable, code blocks styled, blockquotes indented, etc.) while preserving the underlying markdown source. Currently the editor treats everything as plain text with only track-change marks.
-
-- [ ] Evaluate library options: TipTap's built-in nodes/marks (Heading, Bold, Italic, Code, Link, Blockquote, etc.) vs. a markdown-aware TipTap kit like `tiptap-markdown` or `@tiptap/extension-typography`
-- [ ] Ensure markdown decorations coexist with tracked change marks — decorations are orthogonal to insertions/deletions and must not interfere with the intercept model
-- [ ] Add a toggle (on/off) so users can switch between decorated and plain-text views — this toggle is one of the shared editor controls needed across all platforms (see UI Toolbar Refactor item)
-- [ ] Round-trip fidelity: the underlying markdown source must survive decoration → serialization without mutation (no lossy conversion from rich nodes back to markdown)
-- [ ] Handle edge cases: tracked deletion inside a heading, insertion spanning a bold boundary, highlight over a code span, etc.
+- [ ] Rich markdown decorations — scheduled as Phase 10C+D
 
 ### Source View Actions
 - [ ] Paste-to-replace button: replace editor content with clipboard contents (no tracked deletions — rebaselines the document)
@@ -295,18 +298,6 @@ Render markdown syntax as styled content in the editor (headings sized/bolded, b
 - [x] Add a "Keyboard Shortcuts" section to the About panel listing all user-facing shortcuts
 - [x] Include: Cmd+Shift+T (toggle tracking), Cmd+Shift+H (highlight), Tab (jump to comment input when on a change), Enter/Tab in comment input (save/return to editor)
 - [x] Keep in sync as new shortcuts are added
-
-### Empty Editor Default + Placeholder Text
-- [ ] Remove hardcoded sample/dummy content — editor should start blank by default on all platforms
-- [ ] **Web browser:** if a localStorage session exists, offer to restore it (existing RecoveryModal flow); otherwise start blank
-- [ ] **VSCode:** editor loads the document selected via "Open With" (existing `loadDocument` flow); no sample content needed
-- [ ] When the editor is empty, show faint placeholder text (e.g. "Click here to begin writing") — use TipTap's `placeholder` extension or a CSS `:empty::before` pseudo-element
-- [ ] Placeholder disappears as soon as the user types or imports content
-
-### UI Toolbar Refactor (VSCode Compatibility)
-- [ ] Extract editor controls that are relevant across all platforms (track changes on/off, font selector, markdown decorations on/off) into a shared `EditorControls` component
-- [ ] Isolate web-only controls (Import, Export) so they are excluded from the VSCode WebView toolbar — VSCode has its own file I/O and these buttons are meaningless inside the extension
-- [ ] Ensure the shared controls work identically in web, VSCode, and future Tauri targets via the platform adapter's `capabilities` flags
 
 ### Accept / Reject
 - [ ] Accept/reject individual changes to produce a clean document

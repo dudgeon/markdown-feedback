@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
+import Placeholder from '@tiptap/extension-placeholder'
 import {
   TrackedDeletion,
   TrackedInsertion,
@@ -14,23 +15,8 @@ import ChangesPanel from './ChangesPanel'
 import AboutPanel from './AboutPanel'
 import RecoveryModal from './RecoveryModal'
 import SelectionToolbar from './SelectionToolbar'
-import { criticMarkupToHTML } from '../utils/parseCriticMarkup'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { useDocumentStore } from '../stores/documentStore'
-
-const SAMPLE_MARKDOWN = `# Selected Passages from *The Elements of Style*
-
-Vigorous writing is concise. A sentence should contain no unnecessary words, a paragraph no unnecessary sentences, for the same reason that a drawing should have no unnecessary lines and a machine no unnecessary parts. This requires not that the writer make all his sentences short, or that he avoid all detail and treat his subjects only in outline, but that every word tell.
-
-(Rule 17: Omit needless words)
-
-Write with nouns and verbs, not with adjectives and adverbs. The adjective hasn't been built that can pull a weak or inaccurate noun out of a tight place. It is nouns and verbs, not their assistants, that give good writing its toughness and color.
-
-(Chapter V: An Approach to Style, Principle 14)
-
----
-
-**Source:** Strunk, William Jr., and E.B. White. *The Elements of Style*. 4th ed., Longman, 2000.`
 
 export default function Editor() {
   // UI-only local state
@@ -69,24 +55,19 @@ export default function Editor() {
 
   const debouncedMarkup = useDebouncedValue(rawMarkup, 500)
 
-  const { html: initialHTML, comments: initialComments } =
-    criticMarkupToHTML(SAMPLE_MARKDOWN)
-
   const editor = useEditor({
     extensions: [
       StarterKit,
+      Placeholder.configure({ placeholder: 'Click here to begin writing' }),
       TrackedDeletion,
       TrackedInsertion,
       TrackedHighlight,
       TrackChanges,
     ],
-    content: initialHTML,
+    content: '',
     onUpdate: ({ editor }) => handleEditorChange(editor),
     onCreate: ({ editor }) => {
       setEditor(editor)
-      if (Object.keys(initialComments).length > 0) {
-        useDocumentStore.setState({ comments: initialComments })
-      }
       handleEditorChange(editor)
     },
   })
