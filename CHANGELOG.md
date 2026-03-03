@@ -1,5 +1,18 @@
 # Changelog
 
+## [v1.3.1] — 2026-03-02
+
+### Features
+
+- Empty editor default — editor starts blank on all platforms instead of loading sample content; shows faint "Click here to begin writing" placeholder text when empty (4a4828b)
+- Tauri macOS shell — `src-tauri/` boilerplate with Tauri 2, compiles and opens in a native macOS window (compile-tested, not yet manually verified) (e09cb72)
+
+### Infrastructure
+
+- Release process updated to include VSCode `.vsix` artifact; added process audit rule for structural changes (32785cf)
+- iOS app spec added; docs updated for `beforeinput` handler and CSS foundations (1c96133)
+- Phase 8D completion docs and roadmap updates (45e7884)
+
 ## [v1.3.0] — 2026-02-21
 
 ### Features
