@@ -27,14 +27,17 @@ export default function Editor() {
   const [fontPreference, setFontPreference] = useState<'default' | 'literata'>(
     () => (localStorage.getItem('fontPreference') as 'default' | 'literata') ?? 'default'
   )
+  const [decorationsEnabled, setDecorationsEnabled] = useState(false)
 
   // Store state
   const rawMarkup = useDocumentStore((s) => s.rawMarkup)
   const changes = useDocumentStore((s) => s.changes)
   const trackingEnabled = useDocumentStore((s) => s.trackingEnabled)
+  const capabilities = useDocumentStore((s) => s.capabilities)
   const focusCommentId = useDocumentStore((s) => s.focusCommentId)
   const showRecovery = useDocumentStore((s) => s.showRecovery)
   const recoverySession = useDocumentStore((s) => s.recoverySession)
+  const pendingImport = useDocumentStore((s) => s.pendingImport)
 
   // Store actions (stable references)
   const setEditor = useDocumentStore((s) => s.setEditor)
@@ -45,7 +48,6 @@ export default function Editor() {
   const deleteComment = useDocumentStore((s) => s.deleteComment)
   const scrollToChange = useDocumentStore((s) => s.scrollToChange)
   const clearFocusComment = useDocumentStore((s) => s.clearFocusComment)
-  const returnToEditor = useDocumentStore((s) => s.returnToEditor)
   const toggleTracking = useDocumentStore((s) => s.toggleTracking)
   const revertChange = useDocumentStore((s) => s.revertChange)
   const checkForRecovery = useDocumentStore((s) => s.checkForRecovery)
@@ -71,6 +73,16 @@ export default function Editor() {
       handleEditorChange(editor)
     },
   })
+
+  // Keep store's editor ref in sync with useEditor(). When useEditor recreates
+  // the editor instance (HMR, StrictMode double-render), the store ref goes
+  // stale (isDestroyed === true). This effect ensures store actions like
+  // addComment always serialize from the live editor.
+  useEffect(() => {
+    if (editor && !editor.isDestroyed) {
+      setEditor(editor)
+    }
+  }, [editor, setEditor])
 
   // Custom DOM events from TrackChanges plugin
   useEffect(() => {
@@ -102,6 +114,15 @@ export default function Editor() {
   useEffect(() => {
     checkForRecovery()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Process pending imports (recovery, autoLoad) with the live editor instance.
+  // Store actions set pendingImport instead of calling importDocument directly
+  // to avoid using a stale editor ref from Zustand.
+  useEffect(() => {
+    if (pendingImport && editor) {
+      importDocument(pendingImport, editor)
+    }
+  }, [pendingImport, editor]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle 'saveRequested' from VS Code extension host (Cmd+S).
   // Responds with an immediate (non-debounced) save so the extension host
@@ -170,7 +191,13 @@ export default function Editor() {
       onRevert={revertChange}
       focusCommentId={focusCommentId}
       onFocusHandled={clearFocusComment}
-      onReturnToEditor={returnToEditor}
+      onReturnToEditor={() => {
+        // Defer focus to after React unmounts the comment textarea.
+        // If focus() fires before unmount, the browser resets focus to
+        // the body when the previously-focused textarea is removed.
+        // Use the live editor from useEditor, not get().editor (stale).
+        requestAnimationFrame(() => editor?.commands.focus())
+      }}
       onClose={() => setPanelOpen(false)}
     />
   )
@@ -185,8 +212,13 @@ export default function Editor() {
           isPanelOpen={panelOpen}
           changeCount={changes.length}
           markup={rawMarkup}
+          capabilities={capabilities}
           trackingEnabled={trackingEnabled}
           onTrackingToggle={toggleTracking}
+          fontPreference={fontPreference}
+          onFontChange={() => setFontPreference((prev) => (prev === 'default' ? 'literata' : 'default'))}
+          decorationsEnabled={decorationsEnabled}
+          onDecorationsToggle={() => setDecorationsEnabled((prev) => !prev)}
         />
       </div>
 
@@ -233,14 +265,12 @@ export default function Editor() {
       <ImportModal
         isOpen={importOpen}
         onClose={() => setImportOpen(false)}
-        onImport={importDocument}
+        onImport={(text) => editor && importDocument(text, editor)}
       />
 
       <AboutPanel
         isOpen={aboutOpen}
         onClose={() => setAboutOpen(false)}
-        fontPreference={fontPreference}
-        onFontToggle={() => setFontPreference((prev) => (prev === 'default' ? 'literata' : 'default'))}
       />
 
       {showRecovery && recoverySession && (

@@ -4,7 +4,7 @@ import { nanoid } from 'nanoid'
 import { serializeCriticMarkup } from '../utils/serializeCriticMarkup'
 import { extractChanges, type ChangeEntry, type CommentThread } from '../utils/extractChanges'
 import { criticMarkupToHTML } from '../utils/parseCriticMarkup'
-import { createPersistence, type SavedSession } from './persistence'
+import { createPersistence, type SavedSession, type PlatformCapabilities } from './persistence'
 import { getTrackingEnabled, setTrackingEnabled } from '../extensions/trackChanges'
 
 const persistence = createPersistence()
@@ -14,6 +14,9 @@ interface DocumentState {
   comments: Record<string, CommentThread[]>
   changes: ChangeEntry[]
   rawMarkup: string
+
+  // Platform
+  capabilities: PlatformCapabilities
 
   // Phase 8B+ placeholders
   trackingEnabled: boolean
@@ -27,6 +30,10 @@ interface DocumentState {
   showRecovery: boolean
   recoverySession: SavedSession | null
 
+  // Pending import — set by recovery/autoLoad, consumed by Editor.tsx effect
+  // with the live useEditor instance (avoids stale editor ref).
+  pendingImport: string | null
+
   // Editor instance (set once in onCreate, not reactive)
   editor: TipTapEditor | null
 }
@@ -34,7 +41,7 @@ interface DocumentState {
 interface DocumentActions {
   setEditor: (editor: TipTapEditor) => void
   handleEditorChange: (editor: TipTapEditor) => void
-  importDocument: (text: string) => void
+  importDocument: (text: string, editor: TipTapEditor) => void
   addComment: (changeId: string, text: string) => void
   editComment: (changeId: string, threadId: string, text: string) => void
   deleteComment: (changeId: string, threadId: string) => void
@@ -57,17 +64,17 @@ export const useDocumentStore = create<DocumentState & DocumentActions>(
     comments: {},
     changes: [],
     rawMarkup: '',
+    capabilities: persistence.capabilities,
     trackingEnabled: true,
     filePath: null,
     isDirty: false,
     focusCommentId: null,
     showRecovery: false,
     recoverySession: null,
+    pendingImport: null,
     editor: null,
 
-    setEditor: (editor) => {
-      set({ editor })
-    },
+    setEditor: (editor) => set({ editor }),
 
     handleEditorChange: (editor) => {
       const comments = get().comments
@@ -95,39 +102,57 @@ export const useDocumentStore = create<DocumentState & DocumentActions>(
       })
     },
 
-    importDocument: (text) => {
-      const editor = get().editor
-      if (!editor) return
-      const { html, comments: importedComments } = criticMarkupToHTML(text)
-      // Set comments synchronously BEFORE setContent — Zustand's set() is sync,
-      // so handleEditorChange (fired by setContent) sees the correct comments via get()
-      set({ comments: importedComments })
+    importDocument: (text, editor) => {
+      const { html, comments: parsedComments } = criticMarkupToHTML(text)
       editor.commands.setContent(html)
+      // Single atomic set — setContent's emitUpdate defaults to false in
+      // TipTap 3, so onUpdate may not fire. Compute all derived state here
+      // and set everything in one call to avoid intermediate renders.
+      // Always use parsedComments (IDs match the new marks in the doc).
+      // Comment actions re-serialize rawMarkup to include {>>comment<<},
+      // so the markup string is always the source of truth for comments.
+      set({
+        comments: parsedComments,
+        rawMarkup: serializeCriticMarkup(editor.state.doc, parsedComments),
+        changes: extractChanges(editor.state.doc, parsedComments),
+        pendingImport: null,
+      })
     },
 
     addComment: (changeId, text) => {
       if (!text.trim()) return
-      const { editor, comments } = get()
+      const { comments, changes, editor } = get()
       const newThread: CommentThread = { id: nanoid(8), text: text.trim() }
       const updatedComments: Record<string, CommentThread[]> = {
         ...comments,
         [changeId]: [...(comments[changeId] ?? []), newThread],
       }
-      set({ comments: updatedComments })
-      if (editor) {
-        set({
-          rawMarkup: serializeCriticMarkup(editor.state.doc, updatedComments),
-          changes: extractChanges(editor.state.doc, updatedComments),
-        })
-      }
+      // Update changes in-place — don't re-extract from editor.state.doc
+      // because useEditor may have silently replaced the editor instance
+      // with an empty one (React StrictMode / re-render), leaving the
+      // stored reference stale. The next onUpdate will resync fully.
+      const updatedChanges = changes.map((c) =>
+        c.id === changeId
+          ? { ...c, comments: updatedComments[changeId] }
+          : c
+      )
+      // Re-serialize markup to include {>>comment<<} so recovery from
+      // markup alone works (mark IDs change on re-import, so the markup
+      // string must be the single source of truth for comments).
+      // Guard: if editor is destroyed (stale ref from HMR/StrictMode),
+      // keep the existing rawMarkup to avoid overwriting with empty string.
+      const rawMarkup = editor && !editor.isDestroyed
+        ? serializeCriticMarkup(editor.state.doc, updatedComments)
+        : get().rawMarkup
+      set({ comments: updatedComments, changes: updatedChanges, rawMarkup })
+      persistence.save(rawMarkup, updatedComments)
     },
 
     editComment: (changeId, threadId, text) => {
-      const { editor, comments } = get()
+      const { comments, changes, editor } = get()
       const existing = comments[changeId] ?? []
       const updatedComments = { ...comments }
       if (!text.trim()) {
-        // Empty → delete this thread
         const remaining = existing.filter((t) => t.id !== threadId)
         if (remaining.length === 0) {
           delete updatedComments[changeId]
@@ -139,17 +164,20 @@ export const useDocumentStore = create<DocumentState & DocumentActions>(
           t.id === threadId ? { ...t, text: text.trim() } : t
         )
       }
-      set({ comments: updatedComments })
-      if (editor) {
-        set({
-          rawMarkup: serializeCriticMarkup(editor.state.doc, updatedComments),
-          changes: extractChanges(editor.state.doc, updatedComments),
-        })
-      }
+      const updatedChanges = changes.map((c) =>
+        c.id === changeId
+          ? { ...c, comments: updatedComments[changeId] }
+          : c
+      )
+      const rawMarkup = editor && !editor.isDestroyed
+        ? serializeCriticMarkup(editor.state.doc, updatedComments)
+        : get().rawMarkup
+      set({ comments: updatedComments, changes: updatedChanges, rawMarkup })
+      persistence.save(rawMarkup, updatedComments)
     },
 
     deleteComment: (changeId, threadId) => {
-      const { editor, comments } = get()
+      const { comments, changes, editor } = get()
       const remaining = (comments[changeId] ?? []).filter((t) => t.id !== threadId)
       const updatedComments = { ...comments }
       if (remaining.length === 0) {
@@ -157,13 +185,16 @@ export const useDocumentStore = create<DocumentState & DocumentActions>(
       } else {
         updatedComments[changeId] = remaining
       }
-      set({ comments: updatedComments })
-      if (editor) {
-        set({
-          rawMarkup: serializeCriticMarkup(editor.state.doc, updatedComments),
-          changes: extractChanges(editor.state.doc, updatedComments),
-        })
-      }
+      const updatedChanges = changes.map((c) =>
+        c.id === changeId
+          ? { ...c, comments: updatedComments[changeId] }
+          : c
+      )
+      const rawMarkup = editor && !editor.isDestroyed
+        ? serializeCriticMarkup(editor.state.doc, updatedComments)
+        : get().rawMarkup
+      set({ comments: updatedComments, changes: updatedChanges, rawMarkup })
+      persistence.save(rawMarkup, updatedComments)
     },
 
     scrollToChange: (from, to) => {
@@ -303,9 +334,9 @@ export const useDocumentStore = create<DocumentState & DocumentActions>(
       const saved = await persistence.load()
       if (saved) {
         if (persistence.capabilities.autoLoad) {
-          // Native targets (VSCode, Tauri): directly import the file content,
-          // skip the RecoveryModal (there is no "previous session" concept here)
-          get().importDocument(saved.markup)
+          // Native targets (VSCode, Tauri): set pendingImport so
+          // Editor.tsx's effect applies it with the live editor instance
+          set({ pendingImport: saved.markup })
         } else {
           set({ recoverySession: saved, showRecovery: true })
         }
@@ -315,9 +346,16 @@ export const useDocumentStore = create<DocumentState & DocumentActions>(
     resumeSession: () => {
       const session = get().recoverySession
       if (session) {
-        get().importDocument(session.markup)
+        // Don't call importDocument here — the stored editor ref may be stale.
+        // Set pendingImport and let Editor.tsx's effect apply it with the
+        // live useEditor instance.
+        set({
+          pendingImport: session.markup,
+          showRecovery: false,
+        })
+      } else {
+        set({ showRecovery: false })
       }
-      set({ showRecovery: false })
     },
 
     startFresh: () => {
@@ -330,3 +368,8 @@ export const useDocumentStore = create<DocumentState & DocumentActions>(
     },
   })
 )
+
+// Dev-only: expose store for browser console testing
+if (import.meta.env.DEV) {
+  ;(window as unknown as Record<string, unknown>).__docStore = useDocumentStore
+}

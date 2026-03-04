@@ -236,6 +236,24 @@ Refinements that improve the feel but aren't blockers.
 - [x] ~~`handleKeyDown` in TrackChanges plugin does not reliably fire on iOS virtual keyboard for Backspace/Delete~~ — fixed: added `handleDOMEvents.beforeinput` handler that catches all deletion `inputType`s (`deleteContentBackward`, `deleteContentForward`, word/line/cut/drag deletions). On desktop, `handleKeyDown` returns `true` → `preventDefault()` stops `beforeinput` from firing. On iOS (where `keydown` fires with `key: "Unidentified"`), `handleKeyDown` returns `false` and `beforeinput` takes over. A 50ms timestamp guard prevents double-processing edge cases.
 - [x] Full analysis: `docs/desktop-app.md` §8.1, `docs/ios-app.md` §4
 
+### Tab-to-comment broken
+- [ ] Tab key on a tracked change should shift focus to the comment input for that change in the Changes Panel — currently not working. The handler lives in `trackChanges.ts` (`handleKeyDown` → `trackchanges:tab-to-comment` custom event) and the listener is in `Editor.tsx`. Needs investigation — Phase 10B changes did not modify either file, so this may be a pre-existing regression.
+
+### DOCX import broken
+- [ ] .docx file import reports "No tracked changes found" even when the file contains tracked changes. After clicking "Load", the editor content does not update — text editor stays unchanged. The import flow is: `ImportModal.tsx` (file picker) → `parseDocx.ts` (JSZip + DOMParser) → `docxToMarkdown.ts` (OOXML walker) → `criticMarkupToHTML` → `setContent`. Needs investigation — may be a parsing regression or a broken handoff between parse result and editor import.
+
+### Session resume shows empty editor (fixed)
+- [x] ~~After page reload + "Resume" in recovery modal, the text editor appeared empty (shows placeholder text).~~ **Root cause:** Same stale editor problem as the comment bug — `importDocument` called `editor.commands.setContent(html)` on the `editor` reference stored in Zustand, which TipTap 3's `useEditor` had silently replaced with a new instance. The `setContent` went to the stale editor. **Fix:** `importDocument` now accepts an `editor` parameter instead of reading `get().editor`. Recovery paths (`resumeSession`, `checkForRecovery` autoLoad) set a `pendingImport` field in the store, and an effect in `Editor.tsx` processes it with the live `useEditor` instance. ImportModal passes the live editor directly.
+
+### Comment submit hides changes with comments (fixed)
+- [x] ~~When saving a comment, all changes with comments disappeared from the Changes Panel.~~ **Root cause:** `addComment`/`editComment`/`deleteComment` called `extractChanges(editor.state.doc, ...)` but the `editor` reference in the Zustand store was stale — TipTap 3's `useEditor` silently replaced the editor instance during React re-renders, so `editor.state.doc` was empty while the visual editor still showed content. **Fix:** Comment actions no longer read `editor.state.doc`. They update the existing `changes` array in-place by merging comment data into the matching entry. The `rawMarkup` resyncs on the next `handleEditorChange` call from `onUpdate`.
+
+### Comments not persisted across page reload (fixed)
+- [x] ~~After adding a comment on a tracked change, refreshing the page and resuming the session lost all comments (text and changes restored correctly).~~ **Root cause:** `addComment` serialized `rawMarkup` by calling `serializeCriticMarkup(editor.state.doc, updatedComments)` on the store's `editor` reference, which was destroyed (`isDestroyed: true`) due to `useEditor` silently replacing the instance. The destroyed editor's empty doc produced `rawMarkup: ""`, which was saved to localStorage, overwriting the correct markup. **Fix:** (1) Added `useEffect` in `Editor.tsx` to keep the store's editor ref in sync whenever `useEditor` returns a new instance. (2) Added `!editor.isDestroyed` safety guards in `addComment`, `editComment`, and `deleteComment` — if the editor is destroyed, the existing rawMarkup is preserved instead of re-serializing from an empty doc.
+
+### Cursor not refocusing after comment save (fixed)
+- [x] ~~After typing a comment and pressing Enter or Tab, the cursor did not return to the text editor.~~ **Root cause:** `onReturnToEditor` called `editor.commands.focus()` synchronously, but the comment textarea was still mounted. When React unmounted the textarea (the previously focused element), the browser reset focus to `<body>`. **Fix:** Wrapped `editor.commands.focus()` in `requestAnimationFrame()` to defer focus until after React unmounts the textarea.
+
 ### Serialization edge cases
 - [ ] Substitution over text that already contains old deletions — old deletions emit as standalone `{--…--}` outside the `{~~…~~}`, which is semantically correct but may look odd
 - [ ] Serializer only handles paragraphs and headings — lists, blockquotes, code blocks pass through without markdown prefixes

@@ -1,4 +1,6 @@
 import ExportMenu from './ExportMenu'
+import EditorControls from './EditorControls'
+import type { PlatformCapabilities } from '../stores/persistence'
 
 interface ToolbarProps {
   onImportClick: () => void
@@ -7,8 +9,13 @@ interface ToolbarProps {
   isPanelOpen: boolean
   changeCount: number
   markup: string
+  capabilities: PlatformCapabilities
   trackingEnabled: boolean
   onTrackingToggle: () => void
+  fontPreference: 'default' | 'literata'
+  onFontChange: () => void
+  decorationsEnabled: boolean
+  onDecorationsToggle: () => void
 }
 
 export default function Toolbar({
@@ -18,12 +25,17 @@ export default function Toolbar({
   isPanelOpen,
   changeCount,
   markup,
+  capabilities,
   trackingEnabled,
   onTrackingToggle,
+  fontPreference,
+  onFontChange,
+  decorationsEnabled,
+  onDecorationsToggle,
 }: ToolbarProps) {
   return (
     <div className="mb-4 flex items-center justify-between gap-3">
-      {/* Left side: about icon + title + tracking indicator */}
+      {/* Left side: about icon + title + editor controls */}
       <div className="flex items-center gap-2 min-w-0">
         <button
           onClick={onAboutToggle}
@@ -41,38 +53,37 @@ export default function Toolbar({
         <h1 className="text-xl md:text-2xl font-bold text-gray-900 truncate">
           Markdown Feedback
         </h1>
-        <button
-          onClick={onTrackingToggle}
-          className={`flex-shrink-0 flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium cursor-pointer transition-colors ${
-            trackingEnabled
-              ? 'bg-green-50 text-green-700 hover:bg-green-100'
-              : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-          }`}
-          title={trackingEnabled ? 'Tracking changes (Cmd+Shift+T)' : 'Direct editing (Cmd+Shift+T)'}
-          aria-label={trackingEnabled ? 'Tracking changes — click to disable' : 'Direct editing — click to enable tracking'}
-        >
-          <span className={`w-1.5 h-1.5 rounded-full ${trackingEnabled ? 'bg-green-500' : 'bg-gray-400'}`} />
-          <span className="hidden sm:inline">{trackingEnabled ? 'Tracking' : 'Direct'}</span>
-        </button>
+        <EditorControls
+          trackingEnabled={trackingEnabled}
+          onTrackingToggle={onTrackingToggle}
+          fontPreference={fontPreference}
+          onFontChange={onFontChange}
+          decorationsEnabled={decorationsEnabled}
+          onDecorationsToggle={onDecorationsToggle}
+        />
       </div>
 
-      {/* Right side: import, export, panel toggle */}
+      {/* Right side: import, export (web only), panel toggle */}
       <div className="flex items-center gap-2 flex-shrink-0">
-        <button
-          onClick={onImportClick}
-          className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 cursor-pointer transition-colors"
-        >
-          <span className="hidden md:inline">Import</span>
-          <svg
-            className="w-4 h-4 md:hidden"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
-            <path d="M13.75 7h-3V3.66l1.95 2.1a.75.75 0 101.1-1.02l-3.25-3.5a.75.75 0 00-1.1 0L6.2 4.74a.75.75 0 001.1 1.02l1.95-2.1V7h-3A2.25 2.25 0 004 9.25v7.5A2.25 2.25 0 006.25 19h7.5A2.25 2.25 0 0016 16.75v-7.5A2.25 2.25 0 0013.75 7z" />
-          </svg>
-        </button>
+        {!capabilities.nativeFileIO && (
+          <>
+            <button
+              onClick={onImportClick}
+              className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 cursor-pointer transition-colors"
+            >
+              <span className="hidden md:inline">Import</span>
+              <svg
+                className="w-4 h-4 md:hidden"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path d="M13.75 7h-3V3.66l1.95 2.1a.75.75 0 101.1-1.02l-3.25-3.5a.75.75 0 00-1.1 0L6.2 4.74a.75.75 0 001.1 1.02l1.95-2.1V7h-3A2.25 2.25 0 004 9.25v7.5A2.25 2.25 0 006.25 19h7.5A2.25 2.25 0 0016 16.75v-7.5A2.25 2.25 0 0013.75 7z" />
+              </svg>
+            </button>
 
-        <ExportMenu markup={markup} />
+            <ExportMenu markup={markup} />
+          </>
+        )}
 
         <button
           onClick={onPanelToggle}

@@ -132,42 +132,55 @@ function ChangeCard({
   // showReplyInput: whether the new-comment textarea is open
   const [showReplyInput, setShowReplyInput] = useState(false)
   const replyRef = useRef<HTMLTextAreaElement>(null)
+  // When true, the next blur event is skipped (keydown already handled save)
+  const skipBlurRef = useRef(false)
 
   const showInput = showReplyInput || shouldFocus
 
   useEffect(() => {
     if (shouldFocus && replyRef.current) {
+      // Persist the textarea before clearing focusCommentId — otherwise
+      // showInput becomes false and the textarea unmounts immediately.
+      setShowReplyInput(true)
       replyRef.current.focus()
       onFocusHandled()
     }
   }, [shouldFocus, onFocusHandled])
 
-  const handleReplyBlur = useCallback(() => {
+  /** Save textarea content and close the input. */
+  const saveAndClose = useCallback(() => {
     const val = replyRef.current?.value.trim() ?? ''
     if (val) {
       onAddComment(change.id, val)
-      if (replyRef.current) replyRef.current.value = ''
     }
+    if (replyRef.current) replyRef.current.value = ''
     setShowReplyInput(false)
   }, [change.id, onAddComment])
 
+  const handleReplyBlur = useCallback(() => {
+    if (skipBlurRef.current) {
+      skipBlurRef.current = false
+      return
+    }
+    saveAndClose()
+  }, [saveAndClose])
+
   const handleReplyKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.key === 'Tab') {
+      if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
         e.preventDefault()
-        handleReplyBlur()
-        onReturnToEditor()
-      } else if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault()
-        handleReplyBlur()
+        skipBlurRef.current = true
+        saveAndClose()
         onReturnToEditor()
       } else if (e.key === 'Escape') {
+        e.preventDefault()
         if (replyRef.current) replyRef.current.value = ''
+        skipBlurRef.current = true
         setShowReplyInput(false)
         onReturnToEditor()
       }
     },
-    [handleReplyBlur, onReturnToEditor]
+    [saveAndClose, onReturnToEditor]
   )
 
   const threads = change.comments ?? []
@@ -239,7 +252,8 @@ function ChangeCard({
             type="button"
             onMouseDown={(e) => {
               e.preventDefault()
-              handleReplyBlur()
+              skipBlurRef.current = true
+              saveAndClose()
               onReturnToEditor()
             }}
             className="mt-1 px-2 py-0.5 text-xs font-medium text-purple-600 bg-purple-50 border border-purple-200 rounded hover:bg-purple-100 cursor-pointer transition-colors"
