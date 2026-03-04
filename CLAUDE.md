@@ -10,7 +10,7 @@ Full specification lives in `docs/prd.md` and `docs/project-context.md`. Roadmap
 
 **Live:** https://markdown-feedback.com
 
-**Status:** Phase 10A COMPLETE (empty editor default + placeholder text). Phase 8D, 9A+B also complete. Next: Phase 10B (UI toolbar refactor), then 10C+D (rich markdown decorations), then resume Phase 8E (Tauri native file ops). Phase 7E (DOCX polish) partial. See BACKLOG.md for details.
+**Status:** Phase 10B COMPLETE (UI toolbar refactor). Phase 10A, 8D, 9A+B also complete. Next: Phase 10C (rich markdown decorations spike), then 10D (implement), then resume Phase 8E (Tauri native file ops). Phase 7E (DOCX polish) partial. See BACKLOG.md for details.
 
 ## Commands
 
@@ -71,9 +71,10 @@ This project uses an intercept-based architecture, NOT a diff-based approach. Ev
 - `src/utils/parseCriticMarkup.ts` — Reverse of serializer. `parseCriticMarkup()` tokenizes a CriticMarkup string into typed segments including highlights and comments; `criticMarkupToHTML()` returns `{ html, comments }` — the HTML with tracked-change spans, and a Record mapping change IDs to comment text. `extractCommentsFromSegments()` links comment tokens to their preceding change/highlight.
 - `src/utils/exportDocument.ts` — Export functions: `exportCriticMarkup()` (YAML frontmatter + markup), `exportClean()` (accept all changes), `exportOriginal()` (reject all changes), `countChanges()`, `downloadFile()`. Both clean and original exports strip `{==...==}` highlight markers.
 - `src/utils/extractChanges.ts` — Walks ProseMirror doc tree and extracts a structured `ChangeEntry[]` list with type (deletion/insertion/substitution/highlight), text, context snippets, positions, and optional comment text. Accepts a `comments` Record to merge into entries.
-- `src/stores/documentStore.ts` — Zustand store owning all document state (comments, changes, rawMarkup, trackingEnabled, focusCommentId, recovery state) and actions (handleEditorChange, importDocument, setComment, toggleTracking, etc.). Editor instance stored non-reactively. Persistence via `stores/persistence/` abstraction layer.
+- `src/stores/documentStore.ts` — Zustand store owning all document state (comments, changes, rawMarkup, capabilities, trackingEnabled, focusCommentId, recovery state, pendingImport) and actions (handleEditorChange, importDocument, addComment, toggleTracking, etc.). Editor instance stored non-reactively; `Editor.tsx` keeps it in sync via `useEffect` to prevent stale refs. Comment actions use `!editor.isDestroyed` guards. Recovery uses `pendingImport` pattern consumed by an effect with the live editor. Persistence via `stores/persistence/` abstraction layer.
 - `src/stores/persistence/` — Platform-abstracted persistence. `types.ts` defines `PlatformAdapter` (session save/load/clear + optional file I/O + `capabilities` flags). `web.ts` — localStorage adapter; optional fields are no-ops. `index.ts` — factory with commented stubs for VSCode and Tauri detection. New adapters: `vscode.ts` (Phase 9A), `tauri.ts` (Phase 8D).
-- `src/components/Editor.tsx` — Thin layout shell consuming Zustand store. Owns UI-only toggles (sourceExpanded, importOpen, panelOpen, aboutOpen), TipTap `useEditor` setup, debounced values, auto-save effect, and DOM event listeners bridging plugin shortcuts to store actions.
+- `src/components/EditorControls.tsx` — Shared editor controls rendered in toolbar on all platforms: tracking toggle pill, Sans/Serif font toggle, markdown decorations toggle (placeholder/no-op until Phase 10D). Hidden on `< sm:` except tracking dot.
+- `src/components/Editor.tsx` — Thin layout shell consuming Zustand store. Owns UI-only toggles (sourceExpanded, importOpen, panelOpen, aboutOpen, fontPreference, decorationsEnabled), TipTap `useEditor` setup, debounced values, auto-save effect, editor ref sync effect, pendingImport effect, and DOM event listeners bridging plugin shortcuts to store actions.
 - `src/components/ChangesPanel.tsx` — Right sidebar listing all tracked changes and highlights in document order. Shows change type badge, context snippets with inline highlighting, click-to-scroll, and per-entry comment input (auto-save on blur, Tab/Enter to save and return to editor).
 - `src/utils/parseDocx.ts` — Entry point for .docx import. Takes an ArrayBuffer, extracts XML files via JSZip (dynamic import), parses with DOMParser, and calls `docxToMarkdown()`. Extracts `word/document.xml`, `word/comments.xml`, and `word/numbering.xml`.
 - `src/utils/docxToMarkdown.ts` — OOXML walker that converts parsed XML DOMs to a CriticMarkup markdown string. Handles tracked changes (`<w:ins>`, `<w:del>` in both orderings), comments, comment-to-change attribution, and list detection via numbering.xml.
@@ -81,8 +82,8 @@ This project uses an intercept-based architecture, NOT a diff-based approach. Ev
 - `src/components/ExportMenu.tsx` — Dropdown menu with download options (CriticMarkup, clean, original) and copy to clipboard
 - `src/components/SourceView.tsx` — Collapsible panel showing syntax-highlighted CriticMarkup output with copy button
 - `src/components/RecoveryModal.tsx` — Session recovery prompt shown on app load when localStorage has saved state. "Resume" restores via import path; "Start Fresh" clears storage.
-- `src/components/Toolbar.tsx` — Top toolbar with about icon, title, Import (responsive), Export menu, and changes panel toggle with badge
-- `src/components/AboutPanel.tsx` — Left slide-in panel with app description, "Why I built this", GitHub link, and footer
+- `src/components/Toolbar.tsx` — Top toolbar with about icon, title, EditorControls, conditionally-rendered Import/Export (hidden when `capabilities.nativeFileIO`), and changes panel toggle with badge
+- `src/components/AboutPanel.tsx` — Left slide-in panel with app description, "Why I built this", keyboard shortcuts reference, GitHub link, and footer
 - `src/hooks/useDebouncedValue.ts` — Generic debounce hook for source view updates and auto-save
 - `src/index.css` — Track changes visual styles + source view syntax highlighting
 
