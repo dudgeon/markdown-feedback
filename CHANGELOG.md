@@ -1,5 +1,23 @@
 # Changelog
 
+## [v1.4.0] — 2026-03-04
+
+### Features
+
+- UI toolbar refactor (Phase 10B) — new `EditorControls` component with tracking toggle, font selector (moved from About panel), and markdown decorations placeholder. Import/Export buttons conditionally hidden on native platforms via capabilities flags. (f599fbf)
+
+### Fixes
+
+- Fix comments not persisted across page reload — stale destroyed editor ref produced empty rawMarkup on save (f599fbf)
+- Fix comment submit hiding changes from Changes Panel — re-extracted from empty stale editor doc (f599fbf)
+- Fix session resume showing empty editor — `importDocument` used stale editor ref; now uses `pendingImport` pattern with live `useEditor` instance (f599fbf)
+- Fix cursor not refocusing to editor after comment Enter/Tab — deferred focus via `requestAnimationFrame` to wait for textarea unmount (f599fbf)
+- Fix list content dropped from CriticMarkup source and exports (507f81a)
+
+### Infrastructure
+
+- Roadmap and project status updated for Phase 10A+10B completion (c4eb420, cd0fcc7)
+
 ## [v1.3.1] — 2026-03-02
 
 ### Features
