@@ -83,19 +83,24 @@
 
 ---
 
-## Up Next
-
 ### Phase 10: Editor UX Hardening
 Small UI improvements that benefit all platforms (web, VSCode, Tauri) before resuming native app work. Removes assumptions baked in from early prototyping (sample content, monolithic toolbar) and lays groundwork for rich markdown rendering.
 
-**Execution order note:** 10A → 10B → 10C → 10D is a dependency chain. 10A removes sample content (prerequisite for toolbar refactor). 10B separates shared vs. web-only controls (creates the slot for the decorations toggle). 10C is a research spike to derisk 10D. Phase 7E (DOCX polish) can be picked up opportunistically at any point.
-
 - [x] **Phase A:** Empty editor default + placeholder text — remove hardcoded sample content; editor starts blank on all platforms. Web: recover from localStorage if session exists (existing RecoveryModal), otherwise blank. VSCode: loads opened document (existing `loadDocument`). Empty editor shows faint placeholder ("Click here to begin writing") via `@tiptap/extension-placeholder`. Placeholder disappears on first input or import.
-- [x] **Phase B:** UI toolbar refactor — extract shared editor controls (track changes on/off, font selector, markdown decorations on/off) into an `EditorControls` component. Isolate web-only controls (Import, Export) so they are excluded from the VSCode WebView toolbar. Use platform adapter `capabilities` flags for conditional rendering. Markdown decorations toggle is a placeholder/no-op until 10D. Font selector moved from AboutPanel to toolbar.
-- [ ] **Phase C:** Rich markdown decorations spike — time-boxed research. Evaluate TipTap's built-in StarterKit nodes/marks vs. `tiptap-markdown` vs. other approaches. Build a proof-of-concept for tracked-change marks coexisting with decoration nodes (e.g. tracked deletion inside a heading, insertion spanning a bold boundary). Produce a recommendation doc and confirm round-trip serialization fidelity.
-- [ ] **Phase D:** Rich markdown decorations (implement) — render markdown syntax as styled content (headings, bold, italic, links, code, blockquotes) while preserving the underlying source. Toggle on/off via the shared control from 10B. Must not interfere with the intercept model. Round-trip safe.
+- [x] **Phase B:** UI toolbar refactor — extract shared editor controls (track changes on/off, font selector, markdown decorations on/off) into an `EditorControls` component. Isolate web-only controls (Import, Export) so they are excluded from the VSCode WebView toolbar. Use platform adapter `capabilities` flags for conditional rendering. Font selector moved from AboutPanel to toolbar.
+- [x] **Phase C:** Rich markdown decorations spike — time-boxed research. Evaluated TipTap StarterKit nodes/marks vs. `tiptap-markdown` vs. ProseMirror decorations vs. hybrid. Recommendation: Approach A (StarterKit — already active). Spike report: `docs/markdown-decorations-spike.md`.
+- [x] **Phase D:** Rich markdown decorations (implement) — render markdown syntax as styled content (headings, bold, italic, code, strikethrough, lists, blockquotes, code blocks) while preserving the underlying CriticMarkup source. Toggle on/off via toolbar "Rich/Plain" button. Parser enhanced with `richMode` flag for inline markdown and block elements. Serializer emits markdown syntax for all inline marks and block node types. Round-trip safe. Does not interfere with the intercept model. **Known defect (accepted):** In Plain mode, heading `##` markers are not displayed — heading levels cannot be changed in Plain mode. Workaround: edit in Rich mode.
+
+**Phase 10 design decisions:**
+- StarterKit already includes heading, bold, italic, code, strikethrough, lists, blockquote, and code block nodes/marks — no new TipTap extensions needed.
+- `criticMarkupToHTML` accepts a `richMode` boolean. When true, inline markdown (`**`, `*`, `` ` ``, `~~`) is converted to HTML tags (`<strong>`, `<em>`, `<code>`, `<s>`). Block elements (`##`, `- `, `1. `, `> `, triple-backtick code blocks) are converted to their HTML equivalents. When false, all syntax characters are emitted as literal text.
+- `serializeCriticMarkup` handles all block node types (heading, bulletList, orderedList, listItem, blockquote, codeBlock) and inline marks (bold, italic, code, strike) by emitting the appropriate markdown syntax.
+- Toggle re-parses the entire document from `rawMarkup` via `toggleDecorations()` in the store. This is a full re-import, not a decoration layer — the ProseMirror doc structure changes between modes.
+- Decorations preference persisted to `localStorage` under `decorationsEnabled` key.
 
 ---
+
+## Up Next
 
 ### Phase 7: DOCX Import (Google Docs → CriticMarkup)
 Import a `.docx` file exported from Google Docs (with Suggesting mode edits) and reconstruct all tracked changes and comments as CriticMarkup. All processing client-side — JSZip + browser-native DOMParser. Full spec: `docs/docx-import.md`.
@@ -117,7 +122,7 @@ Import a `.docx` file exported from Google Docs (with Suggesting mode edits) and
 ### Phase 8: Multi-Platform Foundation + macOS App
 Platform adapter hardening, then native macOS app via Tauri 2. Full spec: `docs/desktop-app.md`.
 
-**Execution order note:** Phases 8A–D and 9A–B are complete. Phase 10 (editor UX hardening) is done before resuming 8E because the toolbar refactor and empty-editor default improve the shared app that all native targets embed — better to get the UI right before wiring up native file operations.
+**Execution order note:** Phases 8A–D, 9A–B, and 10A–D are all complete. Phase 10 (editor UX hardening) was done before resuming 8E because the toolbar refactor and empty-editor default improve the shared app that all native targets embed — better to get the UI right before wiring up native file operations.
 
 - [x] **Phase A:** State management extraction — moved document state from Editor.tsx into Zustand store (`documentStore.ts`). Abstract persistence layer (`stores/persistence/`). Web app behavior unchanged.
 - [x] **Phase B:** Track changes toggle — module-level `_trackingEnabled` flag, all three handlers check flag and passthrough when disabled. Toolbar toggle pill + Cmd+Shift+T shortcut. `appendTransaction` strips inclusive insertion marks from untracked text. Keyboard shortcuts section added to About panel. Ships on web.
@@ -242,6 +247,9 @@ Refinements that improve the feel but aren't blockers.
 ### DOCX import broken
 - [ ] .docx file import reports "No tracked changes found" even when the file contains tracked changes. After clicking "Load", the editor content does not update — text editor stays unchanged. The import flow is: `ImportModal.tsx` (file picker) → `parseDocx.ts` (JSZip + DOMParser) → `docxToMarkdown.ts` (OOXML walker) → `criticMarkupToHTML` → `setContent`. Needs investigation — may be a parsing regression or a broken handoff between parse result and editor import.
 
+### Plain mode hides heading-level syntax (accepted)
+- [ ] When toggling decorations to "Plain" mode, heading `##` markers are not displayed in the editor and cannot be edited. This means heading levels cannot be changed while in Plain mode. **Accepted defect** — workaround is to switch to Rich mode to edit headings, or edit the source directly. Root cause: TipTap's StarterKit converts `## Heading` into `<h2>` nodes; when decorations are toggled off, the content is re-parsed with `decorationsEnabled: false`, but the existing heading nodes in the ProseMirror doc are already block-level `heading` nodes, not paragraphs with `## ` prefix text. The serializer emits `## ` in the CriticMarkup source, so round-trip fidelity is preserved — this is purely a visual/editing limitation in Plain mode.
+
 ### Session resume shows empty editor (fixed)
 - [x] ~~After page reload + "Resume" in recovery modal, the text editor appeared empty (shows placeholder text).~~ **Root cause:** Same stale editor problem as the comment bug — `importDocument` called `editor.commands.setContent(html)` on the `editor` reference stored in Zustand, which TipTap 3's `useEditor` had silently replaced with a new instance. The `setContent` went to the stale editor. **Fix:** `importDocument` now accepts an `editor` parameter instead of reading `get().editor`. Recovery paths (`resumeSession`, `checkForRecovery` autoLoad) set a `pendingImport` field in the store, and an effect in `Editor.tsx` processes it with the live `useEditor` instance. ImportModal passes the live editor directly.
 
@@ -292,7 +300,7 @@ Refinements that improve the feel but aren't blockers.
 - [ ] Paragraph-level deletions (CriticMarkup can't span paragraph boundaries)
 - [ ] Paste handling: strip formatting vs. preserve markdown-compatible formatting
 - [ ] Merge paragraphs (delete line break between them) — tracked change semantics
-- [ ] Rich markdown decorations — scheduled as Phase 10C+D
+- [x] Rich markdown decorations — completed in Phase 10C+D
 
 ### Source View Actions
 - [ ] Paste-to-replace button: replace editor content with clipboard contents (no tracked deletions — rebaselines the document)

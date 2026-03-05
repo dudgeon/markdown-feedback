@@ -167,12 +167,69 @@ export NVM_DIR="$HOME/.nvm" && [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" 
 - [ ] `npm run build:vscode` succeeds
 - [ ] `npm run package:vscode` succeeds (produces `extension/markdown-feedback-<version>.vsix`)
 
+## Test 17: Rich Markdown Decorations — Toggle
+
+**New in Phase 10D**
+
+- [ ] Click the "Plain" button in the toolbar → button changes to "Rich" with blue styling
+- [ ] Click "Rich" again → toggles back to "Plain"
+- [ ] Reload page → decoration preference persists (check `localStorage.getItem('decorationsEnabled')`)
+
+## Test 18: Rich Markdown Decorations — Import with Formatting
+
+- [ ] Turn decorations ON (click "Plain" → "Rich")
+- [ ] Click Import → paste the following:
+  ```
+  ## A Heading
+
+  This is **bold** and *italic* and `code` and ~~struck~~ text.
+
+  - First item
+  - Second item
+
+  1. One
+  2. Two
+
+  > A blockquote
+
+  ```js
+  const x = 1
+  ```
+  ```
+- [ ] Click "Load" → editor shows:
+  - "A Heading" rendered as a large heading (not `## A Heading`)
+  - "bold" in bold, "italic" in italic, "code" in code style, "struck" in strikethrough
+  - Bullet list with bullets (not `- ` prefixes)
+  - Numbered list with numbers (not `1. ` prefixes)
+  - Blockquote with left border (not `> ` prefix)
+  - Code block with dark background
+- [ ] Source view shows the original markdown syntax preserved (with `##`, `**`, `*`, etc.)
+
+## Test 19: Rich Markdown Decorations — Track Changes + Formatting
+
+- [ ] With decorations ON, import:
+  ```
+  This is **bold original** text.
+  ```
+- [ ] "bold original" appears bold in the editor
+- [ ] Select "original" and type "changed" → substitution: "original" in red strikethrough (still bold), "changed" in green
+- [ ] Source view shows CriticMarkup wrapping the formatted text
+- [ ] Toggle decorations OFF → editor shows raw markdown syntax as literal text
+- [ ] Toggle decorations ON → formatting reappears
+
+## Test 20: Rich Markdown Decorations — Round Trip
+
+- [ ] With decorations ON, import a document with mixed formatting and tracked changes
+- [ ] Export as CriticMarkup → re-import the exported file → editor state matches original
+- [ ] Change count is the same before and after round-trip
+
 ## Known Open Issues (Document, Don't Fail)
 
 These are known broken — note their current status but don't block the release:
 
 - **Tab-to-comment:** Tab on a tracked change should focus the comment input in the panel. Currently broken. Note whether it works or not.
 - **DOCX import:** .docx file import may report "No tracked changes found." Note current behavior.
+- **Plain mode heading syntax:** When decorations are set to "Plain", heading `##` markers are not displayed in the editor — heading levels cannot be changed in Plain mode. This is an accepted defect; headings can be edited in Rich mode or via source export/re-import.
 
 ## Reporting
 

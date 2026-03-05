@@ -10,7 +10,7 @@ Full specification lives in `docs/prd.md` and `docs/project-context.md`. Roadmap
 
 **Live:** https://markdown-feedback.com
 
-**Status:** Phase 10B COMPLETE (UI toolbar refactor). Phase 10A, 8D, 9A+B also complete. Next: Phase 10C (rich markdown decorations spike), then 10D (implement), then resume Phase 8E (Tauri native file ops). Phase 7E (DOCX polish) partial. See BACKLOG.md for details.
+**Status:** Phase 10D COMPLETE (rich markdown decorations). Phase 10A–D, 8A–D, 9A+B also complete. Next: Phase 8E (Tauri native file ops). Phase 7E (DOCX polish) partial. See BACKLOG.md for details.
 
 ## Commands
 
@@ -73,7 +73,7 @@ This project uses an intercept-based architecture, NOT a diff-based approach. Ev
 - `src/utils/extractChanges.ts` — Walks ProseMirror doc tree and extracts a structured `ChangeEntry[]` list with type (deletion/insertion/substitution/highlight), text, context snippets, positions, and optional comment text. Accepts a `comments` Record to merge into entries.
 - `src/stores/documentStore.ts` — Zustand store owning all document state (comments, changes, rawMarkup, capabilities, trackingEnabled, focusCommentId, recovery state, pendingImport) and actions (handleEditorChange, importDocument, addComment, toggleTracking, etc.). Editor instance stored non-reactively; `Editor.tsx` keeps it in sync via `useEffect` to prevent stale refs. Comment actions use `!editor.isDestroyed` guards. Recovery uses `pendingImport` pattern consumed by an effect with the live editor. Persistence via `stores/persistence/` abstraction layer.
 - `src/stores/persistence/` — Platform-abstracted persistence. `types.ts` defines `PlatformAdapter` (session save/load/clear + optional file I/O + `capabilities` flags). `web.ts` — localStorage adapter; optional fields are no-ops. `index.ts` — factory with commented stubs for VSCode and Tauri detection. New adapters: `vscode.ts` (Phase 9A), `tauri.ts` (Phase 8D).
-- `src/components/EditorControls.tsx` — Shared editor controls rendered in toolbar on all platforms: tracking toggle pill, Sans/Serif font toggle, markdown decorations toggle (placeholder/no-op until Phase 10D). Hidden on `< sm:` except tracking dot.
+- `src/components/EditorControls.tsx` — Shared editor controls rendered in toolbar on all platforms: tracking toggle pill, Sans/Serif font toggle, Rich/Plain markdown decorations toggle (Phase 10D). Hidden on `< sm:` except tracking dot.
 - `src/components/Editor.tsx` — Thin layout shell consuming Zustand store. Owns UI-only toggles (sourceExpanded, importOpen, panelOpen, aboutOpen, fontPreference, decorationsEnabled), TipTap `useEditor` setup, debounced values, auto-save effect, editor ref sync effect, pendingImport effect, and DOM event listeners bridging plugin shortcuts to store actions.
 - `src/components/ChangesPanel.tsx` — Right sidebar listing all tracked changes and highlights in document order. Shows change type badge, context snippets with inline highlighting, click-to-scroll, and per-entry comment input (auto-save on blur, Tab/Enter to save and return to editor).
 - `src/utils/parseDocx.ts` — Entry point for .docx import. Takes an ArrayBuffer, extracts XML files via JSZip (dynamic import), parses with DOMParser, and calls `docxToMarkdown()`. Extracts `word/document.xml`, `word/comments.xml`, and `word/numbering.xml`.

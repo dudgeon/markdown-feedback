@@ -23,6 +23,9 @@ interface DocumentState {
   filePath: string | null
   isDirty: boolean
 
+  // Rich markdown decorations (Phase 10D)
+  decorationsEnabled: boolean
+
   // Cross-component coordination
   focusCommentId: string | null
 
@@ -52,6 +55,7 @@ interface DocumentActions {
   setFocusCommentId: (id: string | null) => void
   clearFocusComment: () => void
   toggleTracking: () => void
+  toggleDecorations: () => void
   checkForRecovery: () => Promise<void>
   resumeSession: () => void
   startFresh: () => void
@@ -68,6 +72,7 @@ export const useDocumentStore = create<DocumentState & DocumentActions>(
     trackingEnabled: true,
     filePath: null,
     isDirty: false,
+    decorationsEnabled: localStorage.getItem('decorationsEnabled') === 'true',
     focusCommentId: null,
     showRecovery: false,
     recoverySession: null,
@@ -103,7 +108,7 @@ export const useDocumentStore = create<DocumentState & DocumentActions>(
     },
 
     importDocument: (text, editor) => {
-      const { html, comments: parsedComments } = criticMarkupToHTML(text)
+      const { html, comments: parsedComments } = criticMarkupToHTML(text, get().decorationsEnabled)
       editor.commands.setContent(html)
       // Single atomic set — setContent's emitUpdate defaults to false in
       // TipTap 3, so onUpdate may not fire. Compute all derived state here
@@ -328,6 +333,29 @@ export const useDocumentStore = create<DocumentState & DocumentActions>(
       const next = !getTrackingEnabled()
       setTrackingEnabled(next)
       set({ trackingEnabled: next })
+    },
+
+    toggleDecorations: () => {
+      const { decorationsEnabled, rawMarkup, editor } = get()
+      const next = !decorationsEnabled
+      localStorage.setItem('decorationsEnabled', String(next))
+
+      // Re-parse the document with the new mode
+      if (editor && !editor.isDestroyed && rawMarkup) {
+        const { html, comments: parsedComments } = criticMarkupToHTML(rawMarkup, next)
+        editor.commands.setContent(html)
+        // Merge: use parsedComments for newly parsed IDs, but they're fresh IDs.
+        // Since we re-import, the old comments map is invalid (IDs change).
+        // parsedComments already contains comments extracted from rawMarkup.
+        set({
+          decorationsEnabled: next,
+          comments: parsedComments,
+          rawMarkup: serializeCriticMarkup(editor.state.doc, parsedComments),
+          changes: extractChanges(editor.state.doc, parsedComments),
+        })
+      } else {
+        set({ decorationsEnabled: next })
+      }
     },
 
     checkForRecovery: async () => {

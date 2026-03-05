@@ -154,18 +154,85 @@ export function extractCommentsFromSegments(
  *   - Headings are always single-line blocks (even with only \n after)
  *   - CriticMarkup tokens → <span> elements with tracked-change classes
  *   - Comments → extracted into Record, not rendered as HTML
+ *   - Rich mode: markdown inline syntax (bold, italic, code, strike, links)
+ *     and block elements (lists, blockquotes, code blocks) → real HTML tags
  */
-export function criticMarkupToHTML(text: string): {
+export function criticMarkupToHTML(
+  text: string,
+  richMode: boolean = false
+): {
   html: string
   comments: Record<string, CommentThread[]>
 } {
   const stripped = stripFrontmatter(text)
-  const blocks = splitIntoBlocks(stripped)
+  const blocks = richMode ? splitIntoRichBlocks(stripped) : splitIntoBlocks(stripped)
   const htmlBlocks: string[] = []
   const allComments: Record<string, CommentThread[]> = {}
 
+  const mergeComments = (blockComments: Record<string, CommentThread[]>) => {
+    for (const [key, newThreads] of Object.entries(blockComments)) {
+      if (allComments[key]) {
+        allComments[key] = [...allComments[key], ...newThreads]
+      } else {
+        allComments[key] = newThreads
+      }
+    }
+  }
+
   for (const block of blocks) {
     if (!block.trim()) continue
+
+    // Rich mode: code blocks
+    if (richMode) {
+      const codeBlockMatch = block.match(/^```(?:\w*)\n([\s\S]*?)(?:\n```)?$/)
+      if (codeBlockMatch) {
+        htmlBlocks.push(`<pre><code>${escapeHTML(codeBlockMatch[1])}</code></pre>`)
+        continue
+      }
+    }
+
+    // Rich mode: blockquotes
+    if (richMode && /^> /.test(block)) {
+      const quoteLines = block.split('\n').map((l: string) => l.replace(/^> ?/, ''))
+      const quoteContent = quoteLines.join('\n')
+      const segments = parseCriticMarkup(quoteContent)
+      mergeComments(extractCommentsFromSegments(segments))
+      const inner = segments.map((s) => segmentToHTML(s, richMode)).join('')
+      htmlBlocks.push(`<blockquote><p>${inner}</p></blockquote>`)
+      continue
+    }
+
+    // Rich mode: unordered lists
+    if (richMode && /^[-*] /.test(block)) {
+      const items = block.split('\n').filter((l: string) => l.trim())
+      let listHtml = '<ul>'
+      for (const item of items) {
+        const content = item.replace(/^[-*] /, '')
+        const segments = parseCriticMarkup(content)
+        mergeComments(extractCommentsFromSegments(segments))
+        const inner = segments.map((s) => segmentToHTML(s, richMode)).join('')
+        listHtml += `<li><p>${inner}</p></li>`
+      }
+      listHtml += '</ul>'
+      htmlBlocks.push(listHtml)
+      continue
+    }
+
+    // Rich mode: ordered lists
+    if (richMode && /^\d+\. /.test(block)) {
+      const items = block.split('\n').filter((l: string) => l.trim())
+      let listHtml = '<ol>'
+      for (const item of items) {
+        const content = item.replace(/^\d+\. /, '')
+        const segments = parseCriticMarkup(content)
+        mergeComments(extractCommentsFromSegments(segments))
+        const inner = segments.map((s) => segmentToHTML(s, richMode)).join('')
+        listHtml += `<li><p>${inner}</p></li>`
+      }
+      listHtml += '</ol>'
+      htmlBlocks.push(listHtml)
+      continue
+    }
 
     // Check for heading prefix
     const headingMatch = block.match(/^(#{1,3}) (.*)/)
@@ -183,15 +250,8 @@ export function criticMarkupToHTML(text: string): {
 
     // Parse CriticMarkup tokens within this block
     const segments = parseCriticMarkup(content)
-    const blockComments = extractCommentsFromSegments(segments)
-    for (const [key, newThreads] of Object.entries(blockComments)) {
-      if (allComments[key]) {
-        allComments[key] = [...allComments[key], ...newThreads]
-      } else {
-        allComments[key] = newThreads
-      }
-    }
-    const inner = segments.map(segmentToHTML).join('')
+    mergeComments(extractCommentsFromSegments(segments))
+    const inner = segments.map((s) => segmentToHTML(s, richMode)).join('')
 
     htmlBlocks.push(`<${tag}>${inner}</${tag}>`)
   }
@@ -252,31 +312,152 @@ function splitIntoBlocks(text: string): string[] {
   return blocks
 }
 
+/**
+ * Split markdown text into blocks for rich mode.
+ * In addition to headings, also detects list items, blockquotes, and code blocks
+ * as distinct block types that should be grouped together.
+ */
+function splitIntoRichBlocks(text: string): string[] {
+  const lines = text.split('\n')
+  const blocks: string[] = []
+  let current: string[] = []
+  let inCodeBlock = false
+  let codeBlockLines: string[] = []
+
+  const flush = () => {
+    if (current.length > 0) {
+      blocks.push(current.join('\n'))
+      current = []
+    }
+  }
+
+  for (const line of lines) {
+    // Code block fences
+    if (/^```/.test(line)) {
+      if (!inCodeBlock) {
+        flush()
+        inCodeBlock = true
+        codeBlockLines = [line]
+      } else {
+        codeBlockLines.push(line)
+        blocks.push(codeBlockLines.join('\n'))
+        codeBlockLines = []
+        inCodeBlock = false
+      }
+      continue
+    }
+
+    if (inCodeBlock) {
+      codeBlockLines.push(line)
+      continue
+    }
+
+    const isBlank = line.trim() === ''
+    const isHeading = /^#{1,3} /.test(line)
+    const isUL = /^[-*] /.test(line)
+    const isOL = /^\d+\. /.test(line)
+    const isBQ = /^> /.test(line)
+
+    if (isBlank) {
+      flush()
+    } else if (isHeading) {
+      flush()
+      blocks.push(line)
+    } else if (isUL) {
+      // Accumulate consecutive UL items together
+      if (current.length > 0 && !/^[-*] /.test(current[0])) flush()
+      current.push(line)
+    } else if (isOL) {
+      if (current.length > 0 && !/^\d+\. /.test(current[0])) flush()
+      current.push(line)
+    } else if (isBQ) {
+      if (current.length > 0 && !/^> /.test(current[0])) flush()
+      current.push(line)
+    } else {
+      // Regular paragraph line — don't merge with list/blockquote
+      if (current.length > 0 && (/^[-*] /.test(current[0]) || /^\d+\. /.test(current[0]) || /^> /.test(current[0]))) {
+        flush()
+      }
+      current.push(line)
+    }
+  }
+
+  // Flush remaining
+  if (inCodeBlock && codeBlockLines.length > 0) {
+    blocks.push(codeBlockLines.join('\n'))
+  }
+  flush()
+
+  return blocks
+}
+
 /** Convert a single parsed segment to an HTML string. */
-function segmentToHTML(seg: ParsedSegment): string {
+function segmentToHTML(seg: ParsedSegment, richMode: boolean = false): string {
   const escaped = escapeHTML(seg.text)
+  const content = richMode ? parseInlineMarkdown(escaped) : escaped
 
   switch (seg.type) {
     case 'deletion': {
       const paired = seg.pairedWith
         ? ` data-paired="${seg.pairedWith}"`
         : ''
-      return `<span class="tracked-deletion" data-id="${seg.id}"${paired}>${escaped}</span>`
+      return `<span class="tracked-deletion" data-id="${seg.id}"${paired}>${content}</span>`
     }
     case 'insertion': {
       const paired = seg.pairedWith
         ? ` data-paired="${seg.pairedWith}"`
         : ''
-      return `<span class="tracked-insertion" data-id="${seg.id}"${paired}>${escaped}</span>`
+      return `<span class="tracked-insertion" data-id="${seg.id}"${paired}>${content}</span>`
     }
     case 'highlight':
-      return `<span class="tracked-highlight" data-id="${seg.id}">${escaped}</span>`
+      return `<span class="tracked-highlight" data-id="${seg.id}">${content}</span>`
     case 'comment':
       // Comments don't render as HTML — they're metadata extracted separately
       return ''
     default:
-      return escaped
+      return content
   }
+}
+
+/**
+ * Parse inline markdown syntax in already-escaped HTML text.
+ * Handles: bold (**), italic (*), inline code (`), strikethrough (~~), links ([text](url)).
+ *
+ * Order matters: bold before italic (** before *), and code first (to prevent
+ * parsing markdown inside code spans).
+ */
+function parseInlineMarkdown(text: string): string {
+  let result = text
+
+  // Inline code (backticks) — process first to protect contents from further parsing
+  // Replace code spans with placeholders, process other markdown, then restore
+  const codeSpans: string[] = []
+  result = result.replace(/`([^`]+?)`/g, (_match, code: string) => {
+    const idx = codeSpans.length
+    codeSpans.push(`<code>${code}</code>`)
+    return `\x00CODE${idx}\x00`
+  })
+
+  // Bold: **text** or __text__
+  result = result.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+  result = result.replace(/__(.+?)__/g, '<strong>$1</strong>')
+
+  // Italic: *text* or _text_ (but not inside words for underscore)
+  result = result.replace(/\*(.+?)\*/g, '<em>$1</em>')
+  result = result.replace(/(?<!\w)_(.+?)_(?!\w)/g, '<em>$1</em>')
+
+  // Strikethrough: ~~text~~
+  result = result.replace(/~~(.+?)~~/g, '<s>$1</s>')
+
+  // Links: [text](url)
+  result = result.replace(/\[([^\]]+?)\]\(([^)]+?)\)/g, '<a href="$2">$1</a>')
+
+  // Restore code spans
+  result = result.replace(/\x00CODE(\d+)\x00/g, (_match, idx: string) => {
+    return codeSpans[parseInt(idx, 10)]
+  })
+
+  return result
 }
 
 function escapeHTML(str: string): string {

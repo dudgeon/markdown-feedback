@@ -27,7 +27,8 @@ export default function Editor() {
   const [fontPreference, setFontPreference] = useState<'default' | 'literata'>(
     () => (localStorage.getItem('fontPreference') as 'default' | 'literata') ?? 'default'
   )
-  const [decorationsEnabled, setDecorationsEnabled] = useState(false)
+  const decorationsEnabled = useDocumentStore((s) => s.decorationsEnabled)
+  const toggleDecorations = useDocumentStore((s) => s.toggleDecorations)
 
   // Store state
   const rawMarkup = useDocumentStore((s) => s.rawMarkup)
@@ -218,7 +219,7 @@ export default function Editor() {
           fontPreference={fontPreference}
           onFontChange={() => setFontPreference((prev) => (prev === 'default' ? 'literata' : 'default'))}
           decorationsEnabled={decorationsEnabled}
-          onDecorationsToggle={() => setDecorationsEnabled((prev) => !prev)}
+          onDecorationsToggle={toggleDecorations}
         />
       </div>
 

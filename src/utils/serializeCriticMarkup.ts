@@ -8,6 +8,12 @@ interface Segment {
   isHighlight: boolean
   id: string | null
   pairedWith: string | null
+  // Inline formatting marks
+  bold: boolean
+  italic: boolean
+  code: boolean
+  strike: boolean
+  link: string | null // href if link mark present
 }
 
 /**
@@ -60,6 +66,26 @@ function serializeNode(
     return items.join('\n')
   }
 
+  if (typeName === 'blockquote') {
+    const lines: string[] = []
+    node.forEach((child) => {
+      const segments = collectSegments(child)
+      const markup = serializeSegments(segments, comments)
+      lines.push(indent + '> ' + markup)
+    })
+    return lines.join('\n')
+  }
+
+  if (typeName === 'codeBlock') {
+    const lang = (node.attrs.language as string) ?? ''
+    const code = node.textContent
+    return indent + '```' + lang + '\n' + code + '\n' + indent + '```'
+  }
+
+  if (typeName === 'horizontalRule') {
+    return indent + '---'
+  }
+
   // Textblock (paragraph, heading, etc.) — has inline content
   const prefix = getBlockPrefix(node)
   const segments = collectSegments(node)
@@ -108,6 +134,7 @@ function collectSegments(blockNode: ProseMirrorNode): Segment[] {
     const delMark = node.marks.find((m) => m.type.name === 'trackedDeletion')
     const insMark = node.marks.find((m) => m.type.name === 'trackedInsertion')
     const hlMark = node.marks.find((m) => m.type.name === 'trackedHighlight')
+    const linkMark = node.marks.find((m) => m.type.name === 'link')
 
     segments.push({
       text: node.text,
@@ -116,6 +143,11 @@ function collectSegments(blockNode: ProseMirrorNode): Segment[] {
       isHighlight: !!hlMark,
       id: delMark?.attrs.id ?? insMark?.attrs.id ?? hlMark?.attrs.id ?? null,
       pairedWith: delMark?.attrs.pairedWith ?? insMark?.attrs.pairedWith ?? null,
+      bold: node.marks.some((m) => m.type.name === 'bold'),
+      italic: node.marks.some((m) => m.type.name === 'italic'),
+      code: node.marks.some((m) => m.type.name === 'code'),
+      strike: node.marks.some((m) => m.type.name === 'strike'),
+      link: (linkMark?.attrs.href as string) ?? null,
     })
   })
 
@@ -151,8 +183,8 @@ function serializeSegments(
     }
 
     if (seg.isHighlight) {
-      // Highlight — merge adjacent highlights with the same ID
-      let hlText = seg.text
+      // Highlight — merge adjacent highlights with the same ID and same formatting
+      let hlText = wrapInlineMarkdown(seg.text, seg)
       const hlId = seg.id
       while (
         i + 1 < segments.length &&
@@ -160,7 +192,7 @@ function serializeSegments(
         segments[i + 1].id === hlId
       ) {
         i++
-        hlText += segments[i].text
+        hlText += wrapInlineMarkdown(segments[i].text, segments[i])
       }
       result += `{==${hlText}==}`
       if (hlId) {
@@ -198,8 +230,8 @@ function serializeSegments(
         i++
       }
     } else if (seg.isDeletion) {
-      // Standalone deletion — merge with adjacent standalone deletions
-      let delText = seg.text
+      // Standalone deletion — merge with adjacent standalone deletions with same formatting
+      let delText = wrapInlineMarkdown(seg.text, seg)
       const delId = seg.id
       while (
         i + 1 < segments.length &&
@@ -207,7 +239,7 @@ function serializeSegments(
         !segments[i + 1].pairedWith
       ) {
         i++
-        delText += segments[i].text
+        delText += wrapInlineMarkdown(segments[i].text, segments[i])
       }
       result += `{--${delText}--}`
       if (delId) {
@@ -216,7 +248,7 @@ function serializeSegments(
       }
     } else if (seg.isInsertion) {
       // Standalone insertion — merge with adjacent standalone insertions
-      let insText = seg.text
+      let insText = wrapInlineMarkdown(seg.text, seg)
       const insId = seg.id
       while (
         i + 1 < segments.length &&
@@ -225,7 +257,7 @@ function serializeSegments(
         !(segments[i + 1].id && consumedInsertionIds.has(segments[i + 1].id!))
       ) {
         i++
-        insText += segments[i].text
+        insText += wrapInlineMarkdown(segments[i].text, segments[i])
       }
       result += `{++${insText}++}`
       if (insId) {
@@ -234,7 +266,7 @@ function serializeSegments(
       }
     } else {
       // Original text
-      result += seg.text
+      result += wrapInlineMarkdown(seg.text, seg)
     }
   }
 
@@ -256,7 +288,7 @@ function collectSubstitutionDeletionText(
   for (let i = startIdx; i < segments.length; i++) {
     const seg = segments[i]
     if (seg.isDeletion && seg.pairedWith === pairedInsId) {
-      text += seg.text
+      text += wrapInlineMarkdown(seg.text, seg)
     } else if (seg.isDeletion && !seg.pairedWith) {
       // Old deletion interleaved — skip it (it will be emitted separately)
       continue
@@ -279,7 +311,7 @@ function collectSubstitutionInsertionText(
   let text = ''
   for (const seg of segments) {
     if (seg.isInsertion && seg.id === pairedInsId) {
-      text += seg.text
+      text += wrapInlineMarkdown(seg.text, seg)
       consumedInsertionIds.add(seg.id)
     }
   }
@@ -294,3 +326,16 @@ function getBlockPrefix(node: ProseMirrorNode): string {
   }
   return ''
 }
+
+/** Wrap text in markdown inline syntax based on segment formatting marks. */
+function wrapInlineMarkdown(text: string, seg: Segment): string {
+  let result = text
+  // Order: code innermost (protects content), then strike, italic, bold outermost
+  if (seg.code) result = `\`${result}\``
+  if (seg.strike) result = `~~${result}~~`
+  if (seg.italic) result = `*${result}*`
+  if (seg.bold) result = `**${result}**`
+  if (seg.link) result = `[${result}](${seg.link})`
+  return result
+}
+
