@@ -65,7 +65,7 @@ Edit `.md` files with track changes directly inside VS Code — no browser requi
 
 ### Install
 
-1. Download `markdown-feedback-0.1.0.vsix` from the [latest release](https://github.com/dudgeon/markdown-feedback/releases/latest)
+1. Download the `.vsix` file from the [latest release](https://github.com/dudgeon/markdown-feedback/releases/latest)
 2. In VS Code: open the Command Palette (**Cmd+Shift+P**) → type **"Install from VSIX"** → select the downloaded file
 3. Restart VS Code if prompted
 
