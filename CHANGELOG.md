@@ -1,5 +1,18 @@
 # Changelog
 
+## [v1.5.0] — 2026-03-06
+
+### Features
+
+- Rich markdown decorations (Phase 10D) — Rich/Plain toggle in toolbar renders markdown as styled content (headings, bold, italic, code, strikethrough, lists, blockquotes, code blocks) while preserving the underlying CriticMarkup source. Toggle persists across sessions. Round-trip safe. (e0ad528)
+
+### Infrastructure
+
+- Pre-release browser testing skill (`/test`) with 20 test cases covering all core features and known regression areas (5b3e84d)
+- Tests 17–20 added for rich decoration toggle, import with formatting, track changes + formatting, and round-trip fidelity (e0ad528)
+- Documented known defect: Plain mode hides heading `##` markers (accepted) (e0ad528)
+- Phase 10 marked complete in BACKLOG.md with design decisions (e0ad528)
+
 ## [v1.4.0] — 2026-03-04
 
 ### Features
