@@ -165,7 +165,9 @@ export function criticMarkupToHTML(
   comments: Record<string, CommentThread[]>
 } {
   const stripped = stripFrontmatter(text)
-  const blocks = richMode ? splitIntoRichBlocks(stripped) : splitIntoBlocks(stripped)
+  const rawBlocks = richMode ? splitIntoRichBlocks(stripped) : splitIntoBlocks(stripped)
+  // Pad consecutive table rows for column alignment before generating HTML
+  const blocks = padTableBlocks(rawBlocks)
   const htmlBlocks: string[] = []
   const allComments: Record<string, CommentThread[]> = {}
 
@@ -219,8 +221,10 @@ export function criticMarkupToHTML(
 
     // Rich mode: ordered lists
     if (richMode && /^\d+\. /.test(block)) {
+      // Preserve the starting number (e.g., "2. " → start="2")
+      const startNum = parseInt(block.match(/^(\d+)\. /)![1], 10)
       const items = groupListItems(block, /^\d+\. /)
-      let listHtml = '<ol>'
+      let listHtml = startNum !== 1 ? `<ol start="${startNum}">` : '<ol>'
       for (const content of items) {
         const segments = parseCriticMarkup(content)
         mergeComments(extractCommentsFromSegments(segments))
@@ -432,6 +436,74 @@ function splitIntoRichBlocks(text: string): string[] {
   flush()
 
   return blocks
+}
+
+/**
+ * Find consecutive table-row blocks (starting with |) and pad their cells
+ * for column alignment. Non-table blocks pass through unchanged.
+ */
+function padTableBlocks(blocks: string[]): string[] {
+  const result: string[] = []
+  let i = 0
+  while (i < blocks.length) {
+    if (/^\|/.test(blocks[i])) {
+      // Collect consecutive table rows
+      const tableRows: string[] = []
+      while (i < blocks.length && /^\|/.test(blocks[i])) {
+        tableRows.push(blocks[i])
+        i++
+      }
+      // Pad and push each row as a separate block
+      const padded = padTableCells(tableRows)
+      for (const row of padded) {
+        result.push(row)
+      }
+    } else {
+      result.push(blocks[i])
+      i++
+    }
+  }
+  return result
+}
+
+/**
+ * Pad cells in table rows so columns align.
+ * Parses each row by splitting on |, calculates max width per column,
+ * then pads each cell with trailing spaces. Separator rows get dashes
+ * matching the column width.
+ */
+function padTableCells(rows: string[]): string[] {
+  const parsed = rows.map((row) => {
+    const cells = row.split('|')
+    if (cells.length > 0 && cells[0].trim() === '') cells.shift()
+    if (cells.length > 0 && cells[cells.length - 1].trim() === '') cells.pop()
+    return cells.map((c) => c.trim())
+  })
+
+  const colCount = Math.max(...parsed.map((cells) => cells.length))
+  const colWidths: number[] = new Array(colCount).fill(0)
+
+  for (const cells of parsed) {
+    if (cells.every((c) => /^-+$/.test(c) || c === '')) continue
+    for (let c = 0; c < cells.length; c++) {
+      colWidths[c] = Math.max(colWidths[c], cells[c].length)
+    }
+  }
+
+  for (let c = 0; c < colWidths.length; c++) {
+    colWidths[c] = Math.max(colWidths[c], 3)
+  }
+
+  return rows.map((_row, idx) => {
+    const cells = parsed[idx]
+    const isSeparator = cells.every((c) => /^-+$/.test(c) || c === '')
+    const paddedCells = cells.map((cell, c) => {
+      const width = colWidths[c] ?? cell.length
+      if (isSeparator) return '-'.repeat(width)
+      return cell + ' '.repeat(Math.max(0, width - cell.length))
+    })
+    return '| ' + paddedCells.join(' | ') + ' |'
+  })
 }
 
 /**
