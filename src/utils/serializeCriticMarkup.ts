@@ -34,8 +34,11 @@ export function serializeCriticMarkup(
   const entries: { text: string; isTableRow: boolean }[] = []
 
   doc.forEach((blockNode) => {
-    const isTableRow = blockNode.type.name === 'paragraph' && blockNode.attrs.tableRow === true
-    entries.push({ text: serializeNode(blockNode, comments, ''), isTableRow })
+    const text = serializeNode(blockNode, comments, '')
+    // Detect table rows by content (starts with |) — more robust than relying
+    // on the tableRow attribute surviving TipTap's setContent round-trip
+    const isTableRow = blockNode.type.name === 'paragraph' && /^\|/.test(text)
+    entries.push({ text, isTableRow })
   })
 
   // Post-process: pad consecutive table rows for column alignment,
