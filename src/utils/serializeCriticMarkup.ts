@@ -154,6 +154,9 @@ function collectSegments(blockNode: ProseMirrorNode): Segment[] {
 
   blockNode.forEach((node) => {
     if (!node.isText || !node.text) return
+    // Replace non-breaking spaces (used for table column padding in the
+    // display) with regular spaces for clean file output
+    const nodeText = node.text.replace(/\u00A0/g, ' ')
 
     const delMark = node.marks.find((m) => m.type.name === 'trackedDeletion')
     const insMark = node.marks.find((m) => m.type.name === 'trackedInsertion')
@@ -161,7 +164,7 @@ function collectSegments(blockNode: ProseMirrorNode): Segment[] {
     const linkMark = node.marks.find((m) => m.type.name === 'link')
 
     segments.push({
-      text: node.text,
+      text: nodeText,
       isDeletion: !!delMark,
       isInsertion: !!insMark,
       isHighlight: !!hlMark,

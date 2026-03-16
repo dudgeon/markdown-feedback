@@ -494,13 +494,18 @@ function padTableCells(rows: string[]): string[] {
     colWidths[c] = Math.max(colWidths[c], 3)
   }
 
+  // Use non-breaking spaces (\u00A0) for padding so ProseMirror's HTML
+  // parser doesn't collapse them. The serializer converts these back to
+  // regular spaces when writing the file.
+  const NBSP = '\u00A0'
+
   return rows.map((_row, idx) => {
     const cells = parsed[idx]
     const isSeparator = cells.every((c) => /^-+$/.test(c) || c === '')
     const paddedCells = cells.map((cell, c) => {
       const width = colWidths[c] ?? cell.length
       if (isSeparator) return '-'.repeat(width)
-      return cell + ' '.repeat(Math.max(0, width - cell.length))
+      return cell + NBSP.repeat(Math.max(0, width - cell.length))
     })
     return '| ' + paddedCells.join(' | ') + ' |'
   })

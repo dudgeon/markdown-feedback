@@ -1,5 +1,19 @@
 # Changelog
 
+## [v1.5.2] — 2026-03-16
+
+### Features
+
+- Monospace table rendering with column alignment — table rows display in fixed-width font with cells padded for aligned columns. Separator rows auto-sized with dashes. Serializer outputs clean padded markdown.
+- Ordered lists preserve start number when interrupted by code blocks (e.g. `<ol start="2">`)
+
+### Fixes
+
+- Fix decorations defaulting to off in VSCode — fresh webview localStorage had no value, so `decorationsEnabled` was `false`. Now defaults to `true`.
+- Fix list items, code blocks, and table rows collapsing into single paragraphs in plain mode — block splitter now treats each as a separate block.
+- Fix multi-line list items in rich mode — continuation lines kept in list block, joined with spaces.
+- Fix table column padding not rendering — ProseMirror collapsed regular trailing spaces; now uses non-breaking spaces for display padding, converted back to regular spaces on serialization.
+
 ## [v1.5.1] — 2026-03-15
 
 ### Fixes

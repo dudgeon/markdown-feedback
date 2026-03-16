@@ -2,7 +2,7 @@
   "name": "markdown-feedback",
   "displayName": "Markdown Feedback",
   "description": "Track-changes editor for markdown. Every edit captured as CriticMarkup.",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "publisher": "dudgeon",
   "license": "MIT",
   "repository": {
