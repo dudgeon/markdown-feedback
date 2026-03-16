@@ -72,7 +72,7 @@ export const useDocumentStore = create<DocumentState & DocumentActions>(
     trackingEnabled: true,
     filePath: null,
     isDirty: false,
-    decorationsEnabled: localStorage.getItem('decorationsEnabled') === 'true',
+    decorationsEnabled: localStorage.getItem('decorationsEnabled') !== 'false',
     focusCommentId: null,
     showRecovery: false,
     recoverySession: null,

@@ -278,34 +278,65 @@ function splitIntoBlocks(text: string): string[] {
   const lines = text.split('\n')
   const blocks: string[] = []
   let current: string[] = []
+  let inCodeBlock = false
+  let codeBlockLines: string[] = []
+
+  const flush = () => {
+    if (current.length > 0) {
+      blocks.push(current.join('\n'))
+      current = []
+    }
+  }
 
   for (const line of lines) {
+    // Code block fences — keep as single block even in plain mode
+    if (/^```/.test(line)) {
+      if (!inCodeBlock) {
+        flush()
+        inCodeBlock = true
+        codeBlockLines = [line]
+      } else {
+        codeBlockLines.push(line)
+        blocks.push(codeBlockLines.join('\n'))
+        codeBlockLines = []
+        inCodeBlock = false
+      }
+      continue
+    }
+
+    if (inCodeBlock) {
+      codeBlockLines.push(line)
+      continue
+    }
+
     const isBlank = line.trim() === ''
     const isHeading = /^#{1,3} /.test(line)
+    const isListItem = /^[-*] /.test(line) || /^\d+\. /.test(line)
 
     if (isBlank) {
-      // Blank line ends the current block
-      if (current.length > 0) {
-        blocks.push(current.join('\n'))
-        current = []
-      }
+      flush()
     } else if (isHeading) {
-      // Headings are always their own block — flush any accumulated lines first
-      if (current.length > 0) {
-        blocks.push(current.join('\n'))
-        current = []
+      // Headings are always their own block
+      flush()
+      blocks.push(line)
+    } else if (isListItem) {
+      // List items are their own block in plain mode (prevents collapsing)
+      // Don't flush existing list items — they stay separate
+      if (current.length > 0 && !(/^[-*] /.test(current[0]) || /^\d+\. /.test(current[0]))) {
+        flush()
       }
+      // Each list item is its own paragraph in plain mode
       blocks.push(line)
     } else {
-      // Non-blank, non-heading line — accumulate into current block
       current.push(line)
     }
   }
 
-  // Flush remaining lines
-  if (current.length > 0) {
-    blocks.push(current.join('\n'))
+  // Flush remaining
+  if (inCodeBlock && codeBlockLines.length > 0) {
+    blocks.push(codeBlockLines.join('\n'))
   }
+  flush()
 
   return blocks
 }
