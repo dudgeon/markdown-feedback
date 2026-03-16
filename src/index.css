@@ -87,6 +87,15 @@ body {
   color: inherit;
 }
 
+/* Table rows — monospace for column alignment, tight vertical spacing */
+.tiptap p.table-row {
+  font-family: 'SF Mono', 'Fira Code', 'Fira Mono', Menlo, Consolas, monospace;
+  font-size: 0.85em;
+  line-height: 1.5;
+  margin: 0;
+  white-space: pre;
+}
+
 /* Track changes mark styles */
 .tracked-deletion {
   color: #dc2626;

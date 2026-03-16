@@ -251,7 +251,10 @@ export function criticMarkupToHTML(
     mergeComments(extractCommentsFromSegments(segments))
     const inner = segments.map((s) => segmentToHTML(s, richMode)).join('')
 
-    htmlBlocks.push(`<${tag}>${inner}</${tag}>`)
+    // Table rows get a class for monospace styling (survives TipTap parsing
+    // via the tableRow attribute on the extended Paragraph node)
+    const tableRowAttr = (tag === 'p' && /^\|/.test(block)) ? ' class="table-row"' : ''
+    htmlBlocks.push(`<${tag}${tableRowAttr}>${inner}</${tag}>`)
   }
 
   return { html: htmlBlocks.join(''), comments: allComments }
@@ -312,6 +315,7 @@ function splitIntoBlocks(text: string): string[] {
     const isBlank = line.trim() === ''
     const isHeading = /^#{1,3} /.test(line)
     const isListItem = /^[-*] /.test(line) || /^\d+\. /.test(line)
+    const isTableRow = /^\|/.test(line)
 
     if (isBlank) {
       flush()
@@ -320,12 +324,12 @@ function splitIntoBlocks(text: string): string[] {
       flush()
       blocks.push(line)
     } else if (isListItem) {
-      // List items are their own block in plain mode (prevents collapsing)
-      // Don't flush existing list items — they stay separate
-      if (current.length > 0 && !(/^[-*] /.test(current[0]) || /^\d+\. /.test(current[0]))) {
-        flush()
-      }
       // Each list item is its own paragraph in plain mode
+      flush()
+      blocks.push(line)
+    } else if (isTableRow) {
+      // Each table row is its own paragraph (prevents collapsing)
+      flush()
       blocks.push(line)
     } else {
       current.push(line)
@@ -386,10 +390,15 @@ function splitIntoRichBlocks(text: string): string[] {
     const isUL = /^[-*] /.test(line)
     const isOL = /^\d+\. /.test(line)
     const isBQ = /^> /.test(line)
+    const isTableRow = /^\|/.test(line)
 
     if (isBlank) {
       flush()
     } else if (isHeading) {
+      flush()
+      blocks.push(line)
+    } else if (isTableRow) {
+      // Table rows: each row is its own block (no table node in TipTap StarterKit)
       flush()
       blocks.push(line)
     } else if (isUL) {

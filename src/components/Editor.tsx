@@ -8,6 +8,7 @@ import {
   TrackedHighlight,
   TrackChanges,
 } from '../extensions/trackChanges'
+import { TableRowParagraph } from '../extensions/tableRowParagraph'
 import SourceView from './SourceView'
 import ImportModal from './ImportModal'
 import Toolbar from './Toolbar'
@@ -60,7 +61,8 @@ export default function Editor() {
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({ paragraph: false }),
+      TableRowParagraph,
       Placeholder.configure({ placeholder: 'Click here to begin writing' }),
       TrackedDeletion,
       TrackedInsertion,

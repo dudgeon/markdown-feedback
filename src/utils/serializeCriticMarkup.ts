@@ -30,13 +30,34 @@ export function serializeCriticMarkup(
   doc: ProseMirrorNode,
   comments: Record<string, CommentThread[]> = {}
 ): string {
-  const blocks: string[] = []
+  // Serialize each block node, tagging table rows for post-processing
+  const entries: { text: string; isTableRow: boolean }[] = []
 
   doc.forEach((blockNode) => {
-    blocks.push(serializeNode(blockNode, comments, ''))
+    const isTableRow = blockNode.type.name === 'paragraph' && blockNode.attrs.tableRow === true
+    entries.push({ text: serializeNode(blockNode, comments, ''), isTableRow })
   })
 
-  return blocks.join('\n\n')
+  // Post-process: pad consecutive table rows for column alignment,
+  // and join them with \n (not \n\n)
+  const result: string[] = []
+  let i = 0
+  while (i < entries.length) {
+    if (entries[i].isTableRow) {
+      // Collect consecutive table rows
+      const tableRows: string[] = []
+      while (i < entries.length && entries[i].isTableRow) {
+        tableRows.push(entries[i].text)
+        i++
+      }
+      result.push(padTableColumns(tableRows).join('\n'))
+    } else {
+      result.push(entries[i].text)
+      i++
+    }
+  }
+
+  return result.join('\n\n')
 }
 
 /** Recursively serialize a block node into markdown + CriticMarkup. */
@@ -337,5 +358,56 @@ function wrapInlineMarkdown(text: string, seg: Segment): string {
   if (seg.bold) result = `**${result}**`
   if (seg.link) result = `[${result}](${seg.link})`
   return result
+}
+
+/**
+ * Pad cells in consecutive table rows so columns align.
+ *
+ * Parses each row by splitting on `|`, calculates the max width per column,
+ * then pads each cell with trailing spaces. Separator rows (`|---|---|`)
+ * are re-generated with dashes matching the column width.
+ */
+function padTableColumns(rows: string[]): string[] {
+  // Parse each row into cells (strip leading/trailing empty splits from outer pipes)
+  const parsed = rows.map((row) => {
+    const cells = row.split('|')
+    // Remove first and last empty strings from leading/trailing `|`
+    if (cells.length > 0 && cells[0].trim() === '') cells.shift()
+    if (cells.length > 0 && cells[cells.length - 1].trim() === '') cells.pop()
+    return cells.map((c) => c.trim())
+  })
+
+  // Find max column count and max width per column
+  const colCount = Math.max(...parsed.map((cells) => cells.length))
+  const colWidths: number[] = new Array(colCount).fill(0)
+
+  for (const cells of parsed) {
+    // Skip separator rows for width calculation
+    if (cells.every((c) => /^-+$/.test(c) || c === '')) continue
+    for (let c = 0; c < cells.length; c++) {
+      colWidths[c] = Math.max(colWidths[c], cells[c].length)
+    }
+  }
+
+  // Ensure minimum width of 3 for each column (for separators)
+  for (let c = 0; c < colWidths.length; c++) {
+    colWidths[c] = Math.max(colWidths[c], 3)
+  }
+
+  // Rebuild each row with padded cells
+  return rows.map((_row, idx) => {
+    const cells = parsed[idx]
+    const isSeparator = cells.every((c) => /^-+$/.test(c) || c === '')
+
+    const paddedCells = cells.map((cell, c) => {
+      const width = colWidths[c] ?? cell.length
+      if (isSeparator) {
+        return '-'.repeat(width)
+      }
+      return cell + ' '.repeat(Math.max(0, width - cell.length))
+    })
+
+    return '| ' + paddedCells.join(' | ') + ' |'
+  })
 }
 
