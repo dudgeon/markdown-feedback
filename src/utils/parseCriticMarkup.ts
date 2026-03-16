@@ -204,10 +204,9 @@ export function criticMarkupToHTML(
 
     // Rich mode: unordered lists
     if (richMode && /^[-*] /.test(block)) {
-      const items = block.split('\n').filter((l: string) => l.trim())
+      const items = groupListItems(block, /^[-*] /)
       let listHtml = '<ul>'
-      for (const item of items) {
-        const content = item.replace(/^[-*] /, '')
+      for (const content of items) {
         const segments = parseCriticMarkup(content)
         mergeComments(extractCommentsFromSegments(segments))
         const inner = segments.map((s) => segmentToHTML(s, richMode)).join('')
@@ -220,10 +219,9 @@ export function criticMarkupToHTML(
 
     // Rich mode: ordered lists
     if (richMode && /^\d+\. /.test(block)) {
-      const items = block.split('\n').filter((l: string) => l.trim())
+      const items = groupListItems(block, /^\d+\. /)
       let listHtml = '<ol>'
-      for (const item of items) {
-        const content = item.replace(/^\d+\. /, '')
+      for (const content of items) {
         const segments = parseCriticMarkup(content)
         mergeComments(extractCommentsFromSegments(segments))
         const inner = segments.map((s) => segmentToHTML(s, richMode)).join('')
@@ -374,11 +372,16 @@ function splitIntoRichBlocks(text: string): string[] {
       if (current.length > 0 && !/^> /.test(current[0])) flush()
       current.push(line)
     } else {
-      // Regular paragraph line — don't merge with list/blockquote
-      if (current.length > 0 && (/^[-*] /.test(current[0]) || /^\d+\. /.test(current[0]) || /^> /.test(current[0]))) {
+      // Regular paragraph line
+      if (current.length > 0 && (/^[-*] /.test(current[0]) || /^\d+\. /.test(current[0]))) {
+        // Continuation line within a list item — keep accumulating
+        current.push(line)
+      } else if (current.length > 0 && /^> /.test(current[0])) {
         flush()
+        current.push(line)
+      } else {
+        current.push(line)
       }
-      current.push(line)
     }
   }
 
@@ -389,6 +392,25 @@ function splitIntoRichBlocks(text: string): string[] {
   flush()
 
   return blocks
+}
+
+/**
+ * Group lines in a list block into individual item contents.
+ * Lines starting with the marker pattern begin a new item;
+ * other non-blank lines are continuation lines joined with a space.
+ */
+function groupListItems(block: string, markerRe: RegExp): string[] {
+  const lines = block.split('\n').filter((l: string) => l.trim())
+  const items: string[] = []
+  for (const line of lines) {
+    if (markerRe.test(line)) {
+      items.push(line.replace(markerRe, ''))
+    } else if (items.length > 0) {
+      // Continuation line — append to previous item
+      items[items.length - 1] += ' ' + line.trim()
+    }
+  }
+  return items
 }
 
 /** Convert a single parsed segment to an HTML string. */

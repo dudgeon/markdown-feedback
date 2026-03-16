@@ -1,5 +1,11 @@
 # Changelog
 
+## [v1.5.1] — 2026-03-15
+
+### Fixes
+
+- Fix multi-line list items broken in rich mode — continuation lines (wrapping text without a `- ` or `1. ` prefix) were split into separate paragraphs instead of being joined into the same list item. Affects both ordered and unordered lists in web and VSCode extension.
+
 ## [v1.5.0] — 2026-03-06
 
 ### Features
